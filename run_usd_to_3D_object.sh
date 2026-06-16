@@ -17,7 +17,7 @@ Environment variables:
   OLLAMA_FILTER_MODEL    2단계 필터링용 Ollama 모델명 (기본: gemma3:12b)
   OLLAMA_BASE_URL        Ollama 서버 URL (기본: unset)
   PARSE_TYPE             usd_parse_and_augment 파싱 타입 (object|actor|both, 기본: object)
-  TRELLIS_MODEL_PATH     TRELLIS 모델 경로 또는 HF 모델명 (기본: microsoft/TRELLIS-text-xlarge)
+  TRELLIS_MODEL_PATH     TRELLIS 모델 경로 또는 HF 모델명 (기본: microsoft/TRELLIS-text-base)
   TRELLIS_BASE_OUTPUT    TrellisInferenceCore base_output (기본: /mnt/sdb_1TB/previz/text_to_3d)
   TRELLIS_CONFIG         TRELLIS YAML 설정 경로 (미지정 시 기본 설정 사용)
 
@@ -95,8 +95,35 @@ done
 OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:4b}"
 OLLAMA_FILTER_MODEL="${OLLAMA_FILTER_MODEL:-gemma3:4b}"
 PARSE_TYPE="${PARSE_TYPE:-object}"
-# --model 인자가 있으면 우선 사용, 없으면 환경변수, 둘 다 없으면 기본값
+# --model 인자 > 환경변수 > 기본값 순으로 TRELLIS 모델을 확정합니다.
 TRELLIS_MODEL_PATH="${TRELLIS_MODEL_ARG:-${TRELLIS_MODEL_PATH:-microsoft/TRELLIS-text-base}}"
+
+# TRELLIS_EXTRA_ARGS의 --model_path도 반영하되, OUTPUT_JSON과 2단계가 동일 모델을 쓰도록
+# 여기서 한 번만 resolve하고 extra args에서는 제거합니다. (--model 미지정 시에만 extra가 override)
+FILTERED_TRELLIS_EXTRA_ARGS=()
+i=0
+while [[ $i -lt ${#TRELLIS_EXTRA_ARGS[@]} ]]; do
+  arg="${TRELLIS_EXTRA_ARGS[$i]}"
+  if [[ "$arg" == "--model_path" ]]; then
+    if [[ $((i + 1)) -lt ${#TRELLIS_EXTRA_ARGS[@]} ]]; then
+      if [[ -z "${TRELLIS_MODEL_ARG}" ]]; then
+        TRELLIS_MODEL_PATH="${TRELLIS_EXTRA_ARGS[$((i + 1))]}"
+      fi
+      i=$((i + 2))
+      continue
+    fi
+  elif [[ "$arg" == --model_path=* ]]; then
+    if [[ -z "${TRELLIS_MODEL_ARG}" ]]; then
+      TRELLIS_MODEL_PATH="${arg#--model_path=}"
+    fi
+    i=$((i + 1))
+    continue
+  fi
+  FILTERED_TRELLIS_EXTRA_ARGS+=("$arg")
+  i=$((i + 1))
+done
+TRELLIS_EXTRA_ARGS=("${FILTERED_TRELLIS_EXTRA_ARGS[@]}")
+
 TRELLIS_BASE_OUTPUT="${TRELLIS_BASE_OUTPUT:-${OUTPUT_DIR}}"
 
 # Ollama 서버 자동 시작 (번역 또는 필터링이 활성화된 경우에만)
@@ -178,6 +205,7 @@ OUTPUT_JSON="${OUTPUT_DIR}/${MODEL_NAME}/${CURRENT_DATE}/usd_results.json"
 # JSON 디렉토리 생성
 mkdir -p "$(dirname "${OUTPUT_JSON}")"
 
+echo "🤖 TRELLIS model: ${TRELLIS_MODEL_PATH}"
 echo "📁 JSON 저장 경로: ${OUTPUT_JSON}"
 
 # USD 파일의 기본 디렉토리 (원본 USD 파일들이 있는 위치)
@@ -362,8 +390,9 @@ def find_glb_fallback(object_name, path_key):
         return None
 
     search_dirs = [
-        trellis_output_base / scene_name / scene_name / object_name,
+        trellis_output_base / scene_name / object_name,
         trellis_output_base / scene_name / "shot_unknown" / object_name,
+        trellis_output_base / scene_name / scene_name / object_name,
         trellis_output_base / scene_name / "scene" / object_name,
     ]
     for glb_dir in search_dirs:

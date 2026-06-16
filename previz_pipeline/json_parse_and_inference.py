@@ -133,6 +133,7 @@ def load_augmented_records(
         scene, shot = _extract_scene_shot(file_identifier)
         target_type = item.get('target') or ('object' if item.get('object_path') else 'actor')
         category = item.get('category') or target_type
+        translated_name = item.get('translated_name') or ''
         target_name = object_name
         usd_file_path = _derive_scene_canonical_usd_path(item, usd_root)
 
@@ -147,6 +148,7 @@ def load_augmented_records(
             'target_name': target_name,
             'target_type': target_type,
             'category': category,
+            'translated_name': translated_name,
             # 원본 USD 파일(object_n.usda/actor_n.usda)의 절대 경로.
             # 생성 결과(glb/usd/텍스처)를 원본 USD 옆 assets 폴더에 저장하기 위해 전달.
             'usd_file_path': usd_file_path,

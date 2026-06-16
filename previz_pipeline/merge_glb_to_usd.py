@@ -22,6 +22,7 @@ assets 폴더(예: scene_n/objects/assets/{object_name})에 저장하고,
 출력:
     - assets/{object_name}/{object_name}.geometry.usda: GLB에서 변환된 geometry USD (+ bin/ 텍스처)
     - 원본 object_n.usda: defaultPrim 하위 "geometry" 프림에 geometry reference가 직접 주입됨
+    - 원본 object_n.usda customData: source_glb, geometry_usd 경로 기록
 """
 
 import argparse
@@ -472,6 +473,32 @@ def convert_glb_to_usd(
 # 원본 USD에 geometry reference 추가 (pxr 기반)
 # ---------------------------------------------------------------------------
 
+def _relative_asset_path(from_dir: Path, target: Path) -> str:
+    """USD customData/reference용 상대 asset 경로를 계산합니다."""
+    try:
+        rel_path = os.path.relpath(str(target.resolve()), str(from_dir.resolve()))
+        rel_path = rel_path.replace("\\", "/")
+        if not rel_path.startswith((".", "/")):
+            rel_path = f"./{rel_path}"
+        return rel_path
+    except ValueError:
+        return str(target.resolve())
+
+
+def _write_generated_asset_metadata(
+    root_prim,
+    original_dir: Path,
+    geometry_usd: Path,
+    glb_file: Optional[Path] = None,
+) -> None:
+    """object_n.usda customData에 생성 에셋 경로(source_glb, geometry_usd)를 기록합니다."""
+    geometry_rel = _relative_asset_path(original_dir, geometry_usd)
+    root_prim.SetCustomDataByKey('geometry_usd', Sdf.AssetPath(geometry_rel))
+    if glb_file is not None:
+        glb_rel = _relative_asset_path(original_dir, glb_file)
+        root_prim.SetCustomDataByKey('source_glb', Sdf.AssetPath(glb_rel))
+
+
 def get_root_prim_name_from_usd(usd_file: Path) -> Optional[str]:
     """
     USD 파일에서 defaultPrim 이름을 추출합니다. (pxr 기반)
@@ -491,13 +518,15 @@ def get_root_prim_name_from_usd(usd_file: Path) -> Optional[str]:
 def inject_geometry_reference_into_original(
     original_usd: Path,
     geometry_usd: Path,
-    geometry_prim_name: str
+    geometry_prim_name: str,
+    glb_file: Optional[Path] = None,
 ) -> bool:
     """
     원본 USD(object_n.usda)를 직접 수정하여 geometry USD에 대한 reference를 주입합니다.
 
     - original_usd의 defaultPrim 하위에 "geometry" Xform 프림을 정의(또는 갱신)
     - 그 프림에 geometry USD 파일에 대한 reference를 (상대 경로로) 설정
+    - defaultPrim customData에 source_glb / geometry_usd 경로를 기록
     - 기존 geometry reference가 있으면 모두 제거 후 새 reference로 교체
     - 원본 파일에 직접 저장(Save)
 
@@ -526,16 +555,8 @@ def inject_geometry_reference_into_original(
 
         root_prim_path = root_prim.GetPath()
 
-        # geometry USD에 대한 상대 경로 계산
         original_dir = original_usd.parent.resolve()
-        try:
-            rel_path = os.path.relpath(str(geometry_usd.resolve()), str(original_dir))
-            ref_asset = rel_path.replace("\\", "/")
-            # 같은 디렉토리 이외에는 명시적으로 ./ 접두사를 붙여 상대 경로임을 분명히 함
-            if not ref_asset.startswith((".", "/")):
-                ref_asset = f"./{ref_asset}"
-        except ValueError:
-            ref_asset = str(geometry_usd.resolve())
+        ref_asset = _relative_asset_path(original_dir, geometry_usd)
 
         # defaultPrim 하위에 "geometry" Xform 프림 정의
         geometry_prim_path = root_prim_path.AppendChild("geometry")
@@ -549,6 +570,8 @@ def inject_geometry_reference_into_original(
         refs.ClearReferences()
         refs.AddReference(ref_asset, f"/{geometry_prim_name}")
 
+        _write_generated_asset_metadata(root_prim, original_dir, geometry_usd, glb_file)
+
         # 원본 파일에 직접 저장
         stage.GetRootLayer().Save()
 
@@ -556,6 +579,9 @@ def inject_geometry_reference_into_original(
         print(f"   대상 파일: {original_usd}")
         print(f"   프림 경로: {geometry_prim_path}")
         print(f"   Reference: @{ref_asset}@</{geometry_prim_name}>")
+        if glb_file is not None:
+            print(f"   customData.source_glb: @{_relative_asset_path(original_dir, glb_file)}@")
+        print(f"   customData.geometry_usd: @{ref_asset}@")
         return True
 
     except Exception as e:
@@ -675,7 +701,7 @@ def main():
         actual_prim_name = get_root_prim_name_from_usd(output_usd)
         if actual_prim_name:
             injected = inject_geometry_reference_into_original(
-                args.original_usd, output_usd, actual_prim_name
+                args.original_usd, output_usd, actual_prim_name, glb_file=args.glb_file
             )
             if not injected:
                 sys.exit(1)

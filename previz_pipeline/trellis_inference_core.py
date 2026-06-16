@@ -232,6 +232,30 @@ class TrellisInferenceCore:
         safe = safe.strip('_-')
         return safe or fallback
 
+    def _is_placeholder_shot(self, shot_name: str) -> bool:
+        """shot 정보가 없는 scene canonical 항목인지 판별합니다."""
+        return shot_name in ('shot_unknown', 'unknown', '')
+
+    def _preview_output_path(self, scene_name: str, shot_name: str, target_dir_name: str) -> Path:
+        """미리보기(ply/mp4/jpg) 저장 디렉토리를 구성합니다."""
+        if self._is_placeholder_shot(shot_name):
+            return self.output_base / scene_name / target_dir_name
+        return self.output_base / scene_name / shot_name / target_dir_name
+
+    def _build_file_prefix(self, scene_name: str, shot_name: str, label_name: str, seed: int) -> str:
+        """출력 파일명 접두사를 구성합니다. shot 미지정 시 shot 세그먼트를 생략합니다."""
+        if self._is_placeholder_shot(shot_name):
+            return f"{scene_name}_{label_name}_{seed}"
+        return f"{scene_name}_{shot_name}_{label_name}_{seed}"
+
+    def _resolve_asset_label_name(self, item: Dict, fallback: str = 'item') -> str:
+        """출력 파일명에 사용할 라벨(translated_name 우선)을 결정합니다."""
+        for key in ('translated_name', 'category', 'target_type', 'object_name'):
+            value = item.get(key)
+            if value and str(value).strip():
+                return self._sanitize_path_segment(str(value).strip(), fallback)
+        return fallback
+
     def process_batch_from_records(self, records: List[Dict], config: Dict, output_dir: str = "./outputs") -> None:
         """
         Process prompts from in-memory records (e.g., JSON-derived data).
@@ -247,6 +271,7 @@ class TrellisInferenceCore:
                 - target_name
                 - target_type
                 - category
+                - translated_name
             config: Generation configuration dict (same structure as YAML config).
             output_dir: Target directory for outputs in this run.
         """
@@ -271,6 +296,7 @@ class TrellisInferenceCore:
                 'target_name': record.get('target_name') or record.get('object_name'),
                 'target_type': record.get('target_type'),
                 'category': record.get('category'),
+                'translated_name': record.get('translated_name'),
                 'usd_file_path': record.get('usd_file_path')
             })
 
@@ -306,7 +332,7 @@ class TrellisInferenceCore:
             shot_name = self._sanitize_path_segment(item.get('shot'), 'shot_unknown')
             target_dir_name = self._sanitize_path_segment(item.get('target_name') or predefined_name, 'item_unknown')
             target_type = item.get('target_type') or 'object'
-            category_name = self._sanitize_path_segment(item.get('category') or target_type, target_type)
+            asset_label_name = self._resolve_asset_label_name(item, target_type)
             
             logging.info(f"\n🎯 [{i}/{len(file_data)}] Processing: '{prompt}'")
             if predefined_name:
@@ -332,7 +358,9 @@ class TrellisInferenceCore:
                         'shot': shot_name,
                         'target_dir_name': target_dir_name,
                         'target_type': target_type,
-                        'category': category_name,
+                        'translated_name': item.get('translated_name'),
+                        'category': item.get('category'),
+                        'object_name': object_name,
                         'usd_file_path': item.get('usd_file_path')
                     }
                 )
@@ -431,10 +459,10 @@ class TrellisInferenceCore:
             # DCC용 assets: GLB(+ 이후 merge의 geometry.usda, bin/ 텍스처)만 저장
             object_dir = Path(usd_file_path).resolve().parent / "assets" / target_dir_name
             # 미리보기(ply/mp4/jpg)는 t2o_results 쪽에만 저장
-            preview_dir = self.output_base / scene_name / shot_name / target_dir_name
+            preview_dir = self._preview_output_path(scene_name, shot_name, target_dir_name)
         else:
-            object_dir = self.output_base / scene_name / shot_name / target_dir_name
-            preview_dir = object_dir
+            preview_dir = self._preview_output_path(scene_name, shot_name, target_dir_name)
+            object_dir = preview_dir
         print(f'LLM Model: {llm_model}, target object_dir: {object_dir}')
         if preview_dir != object_dir:
             print(f'   preview_dir: {preview_dir}')
@@ -478,10 +506,9 @@ class TrellisInferenceCore:
         save_start = time.time()
         
         try:
-            # GLB 파일: {object_name}_{model_name}_{llm_model}_{seed}.glb (중복 시 숫자 추가)
-            category_name = context.get('category') or context.get('target_type') or 'item'
-            category_name = self._sanitize_path_segment(category_name, 'item')
-            file_prefix = f"{scene_name}_{shot_name}_{category_name}_{seed}"
+            # GLB/PLY 등: {scene}_{translated_name}_{seed} (shot 미지정 시 shot 생략)
+            asset_label_name = self._resolve_asset_label_name(context, context.get('target_type') or 'item')
+            file_prefix = self._build_file_prefix(scene_name, shot_name, asset_label_name, seed)
             if 'glb' in formats:
                 base_filename = f"{file_prefix}.glb"
                 glb_filename = self._get_unique_filename(object_dir, base_filename)
