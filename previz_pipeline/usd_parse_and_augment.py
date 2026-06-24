@@ -11,6 +11,8 @@ import sys
 import time
 from typing import List, Optional, Dict, Any, Tuple
 
+from bilingual import is_blank, pick_lang
+
 # USD 파서 import
 try:
     from usd_parser import parse_usd_file, ENABLE_ACTOR_PARSING
@@ -101,9 +103,73 @@ def _build_path_to_obj_map(objects: List[Dict[str, str]]) -> Dict[str, Dict[str,
     return mapping
 
 
+def _canonical_object_path(object_path: str) -> str:
+    """shot override 경로를 scene canonical 경로로 변환합니다."""
+    parts = [p for p in object_path.replace("\\", "/").split("/") if p]
+    filtered = [p for p in parts if not re.match(r"^shot_\w+$", p)]
+    return "/".join(filtered) if filtered else object_path
+
+
+def _log_skip_summary(stage: str, skipped: Dict[str, List[str]]) -> None:
+    """건너뛴 항목을 사유별로 출력합니다."""
+    total = sum(len(paths) for paths in skipped.values())
+    if not total:
+        return
+    print(f"[INFO] {stage} 건너뜀: {total}개")
+    reason_labels = {
+        "shot_override_meta_only": "shot override (scene canonical과 중복, geometry 상속)",
+        "no_prompt": "TRELLIS 프롬프트 없음",
+        "target_filter": "타겟 필터 불일치",
+        "no_path": "object_path/actor_path 없음",
+        "no_object_name": "object_name 추출 실패",
+        "no_usd": "원본 USD 파일 없음",
+        "no_scene_canonical": "shot 경로이나 scene canonical USD 없음",
+        "no_glb_dir": "GLB 디렉토리 없음",
+        "no_glb": "GLB 파일 없음 (3D 생성 실패 또는 미실행)",
+    }
+    for reason, paths in skipped.items():
+        label = reason_labels.get(reason, reason)
+        print(f"  - {label}: {len(paths)}개")
+        for path in paths:
+            print(f"      · {path}")
+
+
+def _copy_bilingual_fields(source: Dict[str, Any], target: Dict[str, Any], field_name: str) -> None:
+    """nested dict와 _ko/_en 평탄 필드를 target에 복사합니다."""
+    if field_name in source:
+        target[field_name] = source[field_name]
+    for suffix in ("_ko", "_en"):
+        flat_key = f"{field_name}{suffix}"
+        if flat_key in source:
+            target[flat_key] = source[flat_key]
+
+
+def _has_description(obj: Dict[str, Any]) -> bool:
+    return (
+        not is_blank(obj.get("description"))
+        or bool(str(obj.get("description_en", "")).strip())
+        or bool(str(obj.get("description_ko", "")).strip())
+    )
+
+
+def _get_korean_description(obj: Dict[str, Any]) -> str:
+    return str(obj.get("description_ko") or pick_lang(obj.get("description"), "ko")).strip()
+
+
+def _get_english_description(obj: Dict[str, Any]) -> str:
+    return str(obj.get("description_en") or pick_lang(obj.get("description"), "en")).strip()
+
+
+def _get_korean_name(obj: Dict[str, Any]) -> str:
+    return str(obj.get("name_ko") or pick_lang(obj.get("name"), "ko")).strip()
+
+
 def _get_english_name(obj: Dict[str, str]) -> str:
-    """필터링 LLM 입력용 영어 name (번역본 우선)."""
-    return (obj.get("translated_name") or obj.get("name", "")).strip()
+    """필터링/TRELLIS 입력용 영어 name (번역본 우선, 없으면 USD en)."""
+    translated = str(obj.get("translated_name", "")).strip()
+    if translated:
+        return translated
+    return str(obj.get("name_en") or pick_lang(obj.get("name"), "en")).strip()
 
 
 def _parse_translation_entry(entry: Any) -> Tuple[str, str]:
@@ -139,6 +205,8 @@ def _convert_llm_result_keys(
         found = False
         for path_key, obj in path_to_obj.items():
             if (
+                key == obj.get("description_ko", "") or
+                key == _get_korean_description(obj) or
                 key == obj.get("description", "") or
                 key == obj.get("object_id", "") or
                 key == obj.get("actor_id", "") or
@@ -356,8 +424,8 @@ def translate_descriptions_with_ollama(
         return {}
     
     objects_with_description = [
-        obj for obj in parsed_objects 
-        if obj.get("description", "").strip()
+        obj for obj in parsed_objects
+        if _get_korean_description(obj)
     ]
     
     if not objects_with_description:
@@ -370,11 +438,11 @@ def translate_descriptions_with_ollama(
         llm_obj = {
             "target": obj.get("target", ""),
             "category": obj.get("category", ""),
-            "description": obj.get("description", ""),
+            "description": _get_korean_description(obj),
             "object_path": obj.get("object_path", ""),
             "actor_path": obj.get("actor_path", "")
         }
-        name = obj.get("name", "").strip()
+        name = _get_korean_name(obj)
         if name:
             llm_obj["name"] = name
         objects_for_llm.append(llm_obj)
@@ -434,8 +502,8 @@ def augment_batch_with_ollama(
         return {}
     
     objects_with_description = [
-        obj for obj in parsed_objects 
-        if obj.get("translated_description", obj.get("description", "")).strip()
+        obj for obj in parsed_objects
+        if str(obj.get("translated_description", "")).strip()
     ]
     
     if not objects_with_description:
@@ -450,7 +518,7 @@ def augment_batch_with_ollama(
         llm_obj = {
             "target": obj.get("target", ""),
             "category": obj.get("category", ""),
-            "translated_description": obj.get("translated_description", obj.get("description", "")),
+            "translated_description": obj.get("translated_description", ""),
             "object_path": obj.get("object_path", ""),
             "actor_path": obj.get("actor_path", "")
         }
@@ -548,17 +616,14 @@ def extract_essential_info(parsed_objects: List[Dict[str, str]]) -> List[Dict[st
         essential = {}
         
         if target == "object":
-            # object의 경우
             essential["target"] = "object"
             essential["object_path"] = obj.get("object_path", "")
             essential["object_name"] = obj.get("object_name", "")
             essential["object_id"] = obj.get("object_id", "")
             essential["object_scope"] = obj.get("object_scope", "scene")
-            essential["name"] = obj.get("name", "")
             essential["category"] = obj.get("category", "")
-            # LLM이 기대하는 형식을 위해 description도 추가
-            description = obj.get("description", "")
-            essential["description"] = description
+            _copy_bilingual_fields(obj, essential, "name")
+            _copy_bilingual_fields(obj, essential, "description")
         elif ENABLE_ACTOR_PARSING and target == "actor":
             # [OBJECT-ONLY DISABLED] actor의 경우
             essential["target"] = "actor"
@@ -577,12 +642,10 @@ def extract_essential_info(parsed_objects: List[Dict[str, str]]) -> List[Dict[st
                 essential["object_path"] = obj.get("object_path", "")
                 essential["object_name"] = obj.get("object_name", "")
                 essential["object_id"] = obj.get("object_id", "")
-                essential["name"] = obj.get("name", "")
                 essential["category"] = obj.get("category", "")
-                # LLM이 기대하는 형식을 위해 description도 추가
-                description = obj.get("description", "")
-                essential["description"] = description
-                essential["prompt"] = description  # 최종 JSON용
+                _copy_bilingual_fields(obj, essential, "name")
+                _copy_bilingual_fields(obj, essential, "description")
+                essential["prompt"] = _get_english_description(obj)
             elif ENABLE_ACTOR_PARSING and ("actor_path" in obj or "actor_name" in obj):
                 # [OBJECT-ONLY DISABLED] actor fallback
                 essential["target"] = "actor"
@@ -600,8 +663,7 @@ def extract_essential_info(parsed_objects: List[Dict[str, str]]) -> List[Dict[st
 
         _attach_usd_path_fields(obj, essential)
 
-        # description이 있는 경우만 추가 (LLM에 보낼 때 사용)
-        if essential.get("description", "").strip():
+        if _has_description(essential):
             essential_list.append(essential)
     
     return essential_list
@@ -712,11 +774,11 @@ def parse_and_augment(
         if missing_translation:
             print(f"[WARNING] 번역되지 않은 항목: {missing_translation}개")
     else:
-        print(f"[INFO] 1단계 번역 비활성화됨")
+        print(f"[INFO] 1단계 번역 비활성화됨 — USD en 필드를 translated_description으로 사용")
         translation_model = None
         for obj in essential_objects:
-            obj["translated_description"] = ""
-            obj["translated_name"] = ""
+            obj["translated_description"] = _get_english_description(obj)
+            obj["translated_name"] = _get_english_name(obj)
     
     # 1단계 모델 언로드 여부 결정 (2단계 모델과 다르면 언로드)
     filter_model = filter_model_name if filter_model_name is not None else model_name
@@ -802,8 +864,7 @@ def parse_and_augment(
             final_item["object_path"] = essential.get("object_path", "")
             final_item["object_name"] = essential.get("object_name", "")
             final_item["object_id"] = essential.get("object_id", "")
-            if essential.get("name"):
-                final_item["name"] = essential.get("name", "")
+            _copy_bilingual_fields(essential, final_item, "name")
             if essential.get("translated_name"):
                 final_item["translated_name"] = essential.get("translated_name", "")
         elif ENABLE_ACTOR_PARSING and target == "actor":
@@ -820,7 +881,7 @@ def parse_and_augment(
             final_item["assets_dir"] = essential.get("assets_dir", "")
 
         final_item["category"] = essential.get("category", "")
-        final_item["description"] = essential.get("description", "")
+        _copy_bilingual_fields(essential, final_item, "description")
         final_item["translated_description"] = essential.get("translated_description", "")
         final_item["aug_prompt"] = aug_prompt
         
@@ -836,15 +897,16 @@ def parse_and_augment(
             "object_name": obj.get("object_name", ""),
             "object_id": obj.get("object_id", ""),
             "_pipeline": "meta_only",
+            "_skip_reason": "shot_override_meta_only",
+            "_skip_detail": "scene canonical과 중복; TRELLIS/merge 제외 (geometry는 scene reference로 상속)",
         }
+        canonical_path = _canonical_object_path(obj.get("object_path", ""))
+        if canonical_path:
+            meta_item["canonical_object_path"] = canonical_path
         if obj.get("name"):
             meta_item["name"] = obj.get("name", "")
-        if obj.get("appearance"):
-            meta_item["appearance"] = obj.get("appearance", "")
-        if obj.get("location"):
-            meta_item["location"] = obj.get("location", "")
-        if obj.get("action"):
-            meta_item["action"] = obj.get("action", "")
+        for field in ("appearance", "location", "action"):
+            _copy_bilingual_fields(obj, meta_item, field)
         if obj.get("usd_file_path"):
             meta_item["usd_file_path"] = obj.get("usd_file_path", "")
         final_results.append(meta_item)
@@ -864,10 +926,15 @@ def parse_and_augment(
         "parsed_total": len(parsed_objects),
         "parsed_objects": parsed_objects_count,
         "parsed_actors": parsed_actors_count,
+        "scene_canonical_count": len(scene_objects),
+        "shot_meta_only_count": len(shot_objects),
         "with_description": with_description_count,
         "aug_prompt_count": aug_prompt_count,
         "translated_count": translated_count,
-        "description_only_count": description_only_count
+        "description_only_count": description_only_count,
+        "skipped_shot_override_paths": [
+            o.get("object_path", "") for o in shot_objects if o.get("object_path")
+        ],
     }
     
     # 5. 최종 JSON 저장 (통계 정보 포함)
@@ -886,6 +953,7 @@ def parse_and_augment(
     print(f"  - aug_prompt 사용: {aug_prompt_count}개")
     print(f"  - translated_description 사용: {translated_count}개")
     print(f"  - description만 사용: {description_only_count}개")
+    print(f"  - shot override(meta-only, TRELLIS/merge 제외): {len(shot_objects)}개")
     print(f"[INFO] 총 {len(final_results)}개 항목 저장됨")
 
 

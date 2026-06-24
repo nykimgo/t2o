@@ -1,9 +1,12 @@
 import os
 import time
 import logging
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from bilingual import pick_lang
 import torch
 import random
 
@@ -42,6 +45,7 @@ class TrellisInferenceCore:
         self.pipeline = None
         self.results_data: List[Dict] = []
         self.object_name_counter: Dict[str, int] = {}
+        self.run_id: Optional[str] = None
         
         # 모델명 추출 (경로에서 마지막 부분)
         self.model_name = self._extract_model_name(model_path)
@@ -236,11 +240,55 @@ class TrellisInferenceCore:
         """shot 정보가 없는 scene canonical 항목인지 판별합니다."""
         return shot_name in ('shot_unknown', 'unknown', '')
 
+    def _resolve_output_base(self, output_dir: str) -> Path:
+        """출력 베이스 경로를 결정합니다. run 디렉토리면 그대로 사용합니다."""
+        if output_dir == "./outputs":
+            return self.base_output_dir / "output" / self.model_name / self.current_date
+        path = Path(output_dir)
+        if path.name.startswith("run_") or (path / "run_manifest.json").exists():
+            return path
+        return path / self.model_name / self.current_date
+
     def _preview_output_path(self, scene_name: str, shot_name: str, target_dir_name: str) -> Path:
         """미리보기(ply/mp4/jpg) 저장 디렉토리를 구성합니다."""
+        base = self.output_base / "previews"
         if self._is_placeholder_shot(shot_name):
-            return self.output_base / scene_name / target_dir_name
-        return self.output_base / scene_name / shot_name / target_dir_name
+            return base / scene_name / target_dir_name
+        return base / scene_name / shot_name / target_dir_name
+
+    def _write_generation_json(
+        self,
+        preview_dir: Path,
+        *,
+        prompt: str,
+        context: Dict,
+        seed: int,
+        glb_path: Optional[str],
+        preview_files: List[str],
+    ) -> None:
+        """객체별 생성 provenance를 preview 폴더에 저장합니다."""
+        generation = {
+            "run_id": self.run_id,
+            "object_path": context.get("object_path") or context.get("file_identifier"),
+            "object_name": context.get("object_name"),
+            "prompt_used": prompt,
+            "aug_prompt": context.get("aug_prompt"),
+            "description_en": context.get("description_en"),
+            "translated_description": context.get("translated_description"),
+            "seed": seed,
+            "glb_path": glb_path,
+            "preview_files": preview_files,
+            "timestamp": datetime.now().isoformat(),
+        }
+        out_path = preview_dir / "generation.json"
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(generation, f, ensure_ascii=False, indent=2)
+
+    def _write_glb_meta(self, glb_path: Path, meta: Dict) -> None:
+        """GLB 옆에 .meta.json sidecar를 기록합니다."""
+        meta_path = glb_path.with_suffix(glb_path.suffix + ".meta.json")
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
 
     def _build_file_prefix(self, scene_name: str, shot_name: str, label_name: str, seed: int) -> str:
         """출력 파일명 접두사를 구성합니다. shot 미지정 시 shot 세그먼트를 생략합니다."""
@@ -250,10 +298,15 @@ class TrellisInferenceCore:
 
     def _resolve_asset_label_name(self, item: Dict, fallback: str = 'item') -> str:
         """출력 파일명에 사용할 라벨(translated_name 우선)을 결정합니다."""
-        for key in ('translated_name', 'category', 'target_type', 'object_name'):
+        for key in ('translated_name', 'name_en', 'category', 'target_type', 'object_name'):
             value = item.get(key)
             if value and str(value).strip():
                 return self._sanitize_path_segment(str(value).strip(), fallback)
+        name = item.get('name')
+        if name:
+            picked = pick_lang(name, 'en')
+            if picked.strip():
+                return self._sanitize_path_segment(picked.strip(), fallback)
         return fallback
 
     def process_batch_from_records(self, records: List[Dict], config: Dict, output_dir: str = "./outputs") -> None:
@@ -297,7 +350,12 @@ class TrellisInferenceCore:
                 'target_type': record.get('target_type'),
                 'category': record.get('category'),
                 'translated_name': record.get('translated_name'),
-                'usd_file_path': record.get('usd_file_path')
+                'usd_file_path': record.get('usd_file_path'),
+                'run_id': record.get('run_id'),
+                'object_path': record.get('object_path') or record.get('file_identifier'),
+                'aug_prompt': record.get('aug_prompt'),
+                'description_en': record.get('description_en'),
+                'translated_description': record.get('translated_description'),
             })
 
         if not normalized_records:
@@ -308,9 +366,11 @@ class TrellisInferenceCore:
 
     def _process_file_batch(self, file_data: List[Dict], config: Dict, output_dir: str) -> None:
         """Process a batch of file data with individual settings"""
-        # 사용자 지정 출력 디렉토리가 있으면 그것을 사용, 없으면 기본 구조 사용
-        if output_dir != "./outputs":
-            self.output_base = Path(output_dir) / self.model_name / self.current_date
+        self.output_base = self._resolve_output_base(output_dir)
+        if file_data and file_data[0].get('run_id'):
+            self.run_id = file_data[0]['run_id']
+        elif not self.run_id:
+            self.run_id = os.environ.get('RUN_ID')
         
         # 출력 디렉토리 생성
         self.output_base.mkdir(parents=True, exist_ok=True)
@@ -361,7 +421,13 @@ class TrellisInferenceCore:
                         'translated_name': item.get('translated_name'),
                         'category': item.get('category'),
                         'object_name': object_name,
-                        'usd_file_path': item.get('usd_file_path')
+                        'usd_file_path': item.get('usd_file_path'),
+                        'object_path': item.get('object_path') or item.get('file_identifier'),
+                        'file_identifier': item.get('file_identifier'),
+                        'aug_prompt': item.get('aug_prompt'),
+                        'description_en': item.get('description_en'),
+                        'translated_description': item.get('translated_description'),
+                        'run_id': item.get('run_id') or self.run_id,
                     }
                 )
                 
@@ -503,6 +569,7 @@ class TrellisInferenceCore:
         
         # Save outputs in requested formats
         saved_files = []
+        glb_path_saved: Optional[Path] = None
         save_start = time.time()
         
         try:
@@ -522,7 +589,16 @@ class TrellisInferenceCore:
                 )
                 glb.export(str(glb_path))
                 saved_files.append(str(glb_path))
+                glb_path_saved = glb_path
                 logging.info(f"💾 GLB saved: {glb_filename}")
+                self._write_glb_meta(glb_path, {
+                    "run_id": context.get("run_id") or self.run_id,
+                    "object_path": context.get("object_path") or context.get("file_identifier"),
+                    "prompt_used": prompt,
+                    "aug_prompt": context.get("aug_prompt"),
+                    "description_en": context.get("description_en"),
+                    "seed": seed,
+                })
             
             # PLY 파일: 미리보기 디렉토리에 저장 (assets에는 GLB만)
             if 'ply' in formats:
@@ -590,6 +666,19 @@ class TrellisInferenceCore:
         
         save_time = time.time() - save_start
         total_time = time.time() - start_time
+
+        preview_only = [
+            Path(p).name for p in saved_files
+            if Path(p).parent.resolve() == preview_dir.resolve()
+        ]
+        self._write_generation_json(
+            preview_dir,
+            prompt=prompt,
+            context=context or {},
+            seed=seed,
+            glb_path=str(glb_path_saved) if glb_path_saved else None,
+            preview_files=preview_only,
+        )
         
         return {
             'prompt': prompt,
@@ -597,6 +686,8 @@ class TrellisInferenceCore:
             'seed': seed,
             'model_name': self.model_name,
             'llm_model': llm_model,
+            'run_id': context.get('run_id') or self.run_id,
+            'object_path': context.get('object_path') or context.get('file_identifier'),
             'generation_time': round(generation_time, 2),
             'render_time': round(render_time, 2),
             'save_time': round(save_time, 2),
@@ -619,10 +710,13 @@ class TrellisInferenceCore:
             logging.warning("⚠️ pandas not installed, skipping CSV save")
             return
         
-        # CSV 파일명: results_{model_name}_{current_date}_{time}.csv
-        current_time = datetime.now().strftime('%H%M%S')
-        csv_filename = f"results_{self.model_name}_{self.current_date}_{current_time}.csv"
-        csv_path = self.output_base / csv_filename
+        # run 디렉토리면 results.csv, 아니면 기존 타임스탬프 파일명
+        if self.run_id or (self.output_base / "run_manifest.json").exists():
+            csv_path = self.output_base / "results.csv"
+        else:
+            current_time = datetime.now().strftime('%H%M%S')
+            csv_filename = f"results_{self.model_name}_{self.current_date}_{current_time}.csv"
+            csv_path = self.output_base / csv_filename
         
         results_df = pd.DataFrame(self.results_data)
         results_df.to_csv(csv_path, index=False)

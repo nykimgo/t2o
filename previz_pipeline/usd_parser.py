@@ -11,7 +11,9 @@ ENABLE_ACTOR_PARSING = False
 import json
 import os
 import re
-from typing import List, Optional, Dict
+from typing import Any, List, Optional, Dict
+
+from bilingual import coerce_bilingual, flatten_bilingual_fields, is_blank
 
 # USD Python 바인딩 찾기 및 로드
 USD_AVAILABLE = False
@@ -129,25 +131,48 @@ def _derive_next_base(prim_path_str: str, base_path: Optional[List[str]], child_
 _DESCRIPTION_NOISE_FIELDS = ("userDocBrief",)
 
 
-def _resolve_description(custom_data: Dict) -> str:
+def _resolve_description(custom_data: Dict) -> Dict[str, str]:
     """
-    customData에서 description을 추출합니다.
+    customData에서 description을 {ko, en} 형태로 추출합니다.
 
     우선순위: description -> base_description -> appearance(shot override fallback)
     - 신규 USD 스키마는 base_description을, 구 스키마는 description을 사용합니다.
     - shot override는 base_description이 없을 수 있으므로 appearance를 마지막 폴백으로 사용합니다.
     - userDocBrief 등 USD 스키마 노이즈 필드는 description 후보에서 제외합니다.
     """
+    merged = {"ko": "", "en": ""}
     for field in ("description", "base_description", "appearance"):
         if field in _DESCRIPTION_NOISE_FIELDS:
             continue
         value = custom_data.get(field, "")
         if value is None:
             continue
-        text = str(value).strip()
-        if text:
-            return text
-    return ""
+        candidate = coerce_bilingual(value)
+        for lang in ("ko", "en"):
+            if not merged[lang].strip() and candidate.get(lang, "").strip():
+                merged[lang] = candidate[lang]
+        if merged["ko"].strip() and merged["en"].strip():
+            break
+    return merged
+
+
+def _resolve_bilingual_field(custom_data: Dict, field_name: str) -> Dict[str, str]:
+    """customData의 단일 필드를 {ko, en}으로 정규화합니다."""
+    value = custom_data.get(field_name, "")
+    if value is None:
+        return {"ko": "", "en": ""}
+    return coerce_bilingual(value)
+
+
+def _attach_bilingual_object_fields(result: Dict[str, Any], custom_data: Dict) -> None:
+    """object 결과 dict에 bilingual 메타 필드를 기록합니다."""
+    description = _resolve_description(custom_data)
+    flatten_bilingual_fields(result, "description", description)
+
+    for field_name in ("name", "appearance", "location", "action"):
+        bilingual = _resolve_bilingual_field(custom_data, field_name)
+        if not is_blank(bilingual):
+            flatten_bilingual_fields(result, field_name, bilingual)
 
 
 def _determine_object_scope(object_path: Optional[str], usd_file_path: Optional[str] = None) -> str:
@@ -311,51 +336,35 @@ def parse_usd_file_with_api(
     is_actor_file = ENABLE_ACTOR_PARSING and file_parent == "actors"
     
     def _build_object_result(custom_data: Dict[str, str], usd_file_path: str = None) -> Optional[Dict[str, str]]:
-        description = _resolve_description(custom_data)
         category = custom_data.get("category", "")
         object_id = custom_data.get("object_id", "")
         image_path = custom_data.get("image_path", "")
-        name = custom_data.get("name", "")
-        appearance = custom_data.get("appearance", "")
-        
-        # object_path 생성: base_path의 마지막 요소가 file_stem과 같으면 중복 추가하지 않음
+
         if base_path and len(base_path) > 0 and base_path[-1] == file_stem:
             object_path = "/".join(base_path)
         else:
             object_path = "/".join(base_path + [file_stem]) if base_path else file_stem
-        
-        # object_name은 file_stem만 사용 (object_1 형식)
+
         object_name = file_stem
-        
-        # base_path: USD 파일이 있는 디렉토리(예: .../scene_1/shot_3/objects)의 상위 디렉토리(예: .../scene_1/shot_3)
         base_path_str = os.path.dirname(base_dir)
-        
+
         result = {
             "target": "object",
             "object_name": object_name,
             "object_path": object_path,
             "object_id": object_id or file_stem,
-            "description": description,
             "object_scope": _determine_object_scope(object_path, usd_file_path),
             "parsing_method": "pxr",
             "base_path": base_path_str,
         }
-        if name:
-            result["name"] = name
+        _attach_bilingual_object_fields(result, custom_data)
         if category:
             result["category"] = category
-        if appearance:
-            result["appearance"] = appearance
-        if "location" in custom_data:
-            result["location"] = custom_data["location"]
-        if "action" in custom_data:
-            result["action"] = custom_data["action"]
         if image_path:
             result["image_path"] = image_path
-        # USD 파일 경로 저장 (reference 경로)
         if usd_file_path:
             result["usd_file_path"] = os.path.normpath(usd_file_path)
-        
+
         return result
     
     # [OBJECT-ONLY DISABLED] actor 결과 빌더 — ENABLE_ACTOR_PARSING=True 시 사용
@@ -448,7 +457,6 @@ def parse_usd_file_with_api(
                 "object_name": object_name,
                 "object_path": object_path,
                 "object_id": file_stem,
-                "description": "",
                 "object_scope": _determine_object_scope(object_path, usd_file_path),
                 "parsing_method": "pxr",
                 "base_path": base_path_str,
@@ -740,7 +748,31 @@ def parse_usd_file_regex(
     def _extract_field(block: str, field: str) -> str:
         match = re.search(rf'string {re.escape(field)}\s*=\s*"([^"]*)"', block)
         return match.group(1) if match else ""
-    
+
+    def _extract_bilingual_field(block: str, field: str) -> Dict[str, str]:
+        dict_match = re.search(
+            rf'dictionary\s+{re.escape(field)}\s*=\s*\{{([^{{}}]*)\}}',
+            block,
+            re.DOTALL,
+        )
+        if dict_match:
+            inner = dict_match.group(1)
+            ko_match = re.search(r'string\s+ko\s*=\s*"([^"]*)"', inner)
+            en_match = re.search(r'string\s+en\s*=\s*"([^"]*)"', inner)
+            return coerce_bilingual({
+                "ko": ko_match.group(1) if ko_match else "",
+                "en": en_match.group(1) if en_match else "",
+            })
+        return coerce_bilingual(_extract_field(block, field))
+
+    def _build_custom_data_from_block(custom_block: str) -> Dict[str, Any]:
+        custom_data: Dict[str, Any] = {}
+        for field_name in ("description", "base_description", "appearance", "name", "location", "action"):
+            bilingual = _extract_bilingual_field(custom_block, field_name)
+            if not is_blank(bilingual):
+                custom_data[field_name] = bilingual
+        return custom_data
+
     def _extract_customdata_block(content: str) -> str:
         """
         customData = { ... } 블록을 중괄호 균형 매칭으로 추출합니다.
@@ -773,20 +805,11 @@ def parse_usd_file_regex(
             return
         
         custom_block = _extract_customdata_block(content)
-        
-        # description 우선순위: description -> base_description -> appearance (shot fallback)
-        description = (
-            _extract_field(custom_block, "description")
-            or _extract_field(custom_block, "base_description")
-            or _extract_field(custom_block, "appearance")
-        )
+        custom_data = _build_custom_data_from_block(custom_block)
+
         category = _extract_field(custom_block, "category")
         object_id = _extract_field(custom_block, "object_id") or os.path.splitext(os.path.basename(file_path_abs))[0]
-        location = _extract_field(custom_block, "location")
-        action = _extract_field(custom_block, "action")
         image_path = _extract_field(custom_block, "image_path")
-        name = _extract_field(custom_block, "name")
-        appearance = _extract_field(custom_block, "appearance")
         
         # base_components에 이미 object 이름이 포함되어 있을 수 있음 (예: ["scene_1", "shot_1", "object_1"])
         file_stem = os.path.splitext(os.path.basename(file_path_abs))[0]
@@ -808,21 +831,13 @@ def parse_usd_file_regex(
             "object_name": object_name,
             "object_path": object_path,
             "object_id": object_id,
-            "description": description,
             "object_scope": _determine_object_scope(object_path, file_path_abs),
             "parsing_method": "regex",
             "base_path": base_path_str,
         }
-        if name:
-            result["name"] = name
+        _attach_bilingual_object_fields(result, custom_data)
         if category:
             result["category"] = category
-        if appearance:
-            result["appearance"] = appearance
-        if location:
-            result["location"] = location
-        if action:
-            result["action"] = action
         if image_path:
             result["image_path"] = image_path
         if relative_path:
@@ -1182,8 +1197,10 @@ if __name__ == "__main__":
         
         # description이 있는 항목만 필터링
         results_with_description = [
-            r for r in results 
-            if r.get("description", "").strip()
+            r for r in results
+            if not is_blank(r.get("description"))
+            or r.get("description_en", "").strip()
+            or r.get("description_ko", "").strip()
         ]
         print(f"description이 있는 항목 수: {len(results_with_description)}")
         

@@ -3,8 +3,34 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from collections import defaultdict
 
+from bilingual import pick_lang
 from trellis_inference_core import TrellisInferenceCore
+
+
+def _canonical_object_path(object_path: str) -> str:
+    parts = [p for p in object_path.replace('\\', '/').split('/') if p]
+    filtered = [p for p in parts if not (p.lower().startswith('shot_'))]
+    return '/'.join(filtered) if filtered else object_path
+
+
+def _log_skipped_items(stage: str, skipped: Dict[str, List[str]]) -> None:
+    total = sum(len(paths) for paths in skipped.values())
+    if not total:
+        return
+    labels = {
+        "shot_override_meta_only": "shot override (scene canonical과 중복, geometry 상속)",
+        "no_prompt": "TRELLIS 프롬프트 없음",
+        "target_filter": "타겟 필터 불일치",
+    }
+    logging.info("ℹ️ %s 건너뜀: %d개", stage, total)
+    for reason, paths in skipped.items():
+        logging.info("  - %s: %d개", labels.get(reason, reason), len(paths))
+        if reason == "shot_override_meta_only":
+            continue
+        for path in paths:
+            logging.info("      · %s", path)
 
 
 def _sanitize_name(value: Optional[str]) -> Optional[str]:
@@ -84,6 +110,7 @@ def load_augmented_records(
     use_json_seed: bool,
     llm_label: Optional[str],
     usd_root: Optional[Path] = None,
+    run_id: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     with json_path.open('r', encoding='utf-8') as f:
         payload = json.load(f)
@@ -96,27 +123,32 @@ def load_augmented_records(
         raise ValueError("JSON 구조를 파악할 수 없습니다. 'results' 리스트가 필요합니다.")
 
     records: List[Dict[str, Any]] = []
-    skipped_shot = 0
+    skipped: Dict[str, List[str]] = defaultdict(list)
     for idx, item in enumerate(entries):
+        item_path = item.get('object_path') or item.get('actor_path') or f"item_{idx}"
+
         if target_filter and item.get('target') != target_filter:
+            skipped["target_filter"].append(item_path)
             continue
 
         # Scene canonical만 TRELLIS 생성 대상 (스펙 2.1, #3)
-        # shot override / meta-only 항목은 3D를 생성하지 않습니다 (scene canonical reference로 geometry 상속).
         if item.get('object_scope') == 'shot' or item.get('_pipeline') == 'meta_only':
-            skipped_shot += 1
+            skipped["shot_override_meta_only"].append(item_path)
             continue
 
-        # 프롬프트 우선순위: aug_prompt -> translated_description -> description
+        # 프롬프트 우선순위: aug_prompt -> translated_description -> description_en -> description(en)
         prompt_text: Optional[str] = None
         if prefer_aug_prompt:
             prompt_text = item.get('aug_prompt')
         if not prompt_text:
             prompt_text = item.get('translated_description')
-        if not prompt_text and allow_original_fallback:
-            prompt_text = item.get('description')
         if not prompt_text:
-            logging.warning("⚠️ 프롬프트가 없어 건너뜁니다: %s", item.get('object_path') or item.get('actor_path') or idx)
+            prompt_text = item.get('description_en')
+        if not prompt_text and allow_original_fallback:
+            prompt_text = pick_lang(item.get('description'), 'en')
+        if not prompt_text:
+            logging.warning("⚠️ 프롬프트가 없어 건너뜁니다: %s", item_path)
+            skipped["no_prompt"].append(item_path)
             continue
 
         name_candidates = [
@@ -133,7 +165,12 @@ def load_augmented_records(
         scene, shot = _extract_scene_shot(file_identifier)
         target_type = item.get('target') or ('object' if item.get('object_path') else 'actor')
         category = item.get('category') or target_type
-        translated_name = item.get('translated_name') or ''
+        translated_name = (
+            item.get('translated_name')
+            or item.get('name_en')
+            or pick_lang(item.get('name'), 'en')
+            or ''
+        )
         target_name = object_name
         usd_file_path = _derive_scene_canonical_usd_path(item, usd_root)
 
@@ -143,14 +180,17 @@ def load_augmented_records(
             'seed': record_seed,
             'llm_model': label,
             'file_identifier': file_identifier,
+            'object_path': file_identifier,
             'scene': scene,
             'shot': shot,
             'target_name': target_name,
             'target_type': target_type,
             'category': category,
             'translated_name': translated_name,
-            # 원본 USD 파일(object_n.usda/actor_n.usda)의 절대 경로.
-            # 생성 결과(glb/usd/텍스처)를 원본 USD 옆 assets 폴더에 저장하기 위해 전달.
+            'aug_prompt': item.get('aug_prompt'),
+            'description_en': item.get('description_en'),
+            'translated_description': item.get('translated_description'),
+            'run_id': run_id,
             'usd_file_path': usd_file_path,
             'usd_relative_path': item.get('usd_relative_path')
         })
@@ -158,8 +198,7 @@ def load_augmented_records(
         if max_items and len(records) >= max_items:
             break
 
-    if skipped_shot:
-        logging.info("ℹ️ shot override/meta-only %d개는 TRELLIS 생성 대상에서 제외했습니다 (scene canonical만 생성).", skipped_shot)
+    _log_skipped_items("Stage 2 (TRELLIS)", skipped)
 
     return records
 
@@ -172,6 +211,8 @@ def parse_args():
     parser.add_argument('--model_path', default='microsoft/TRELLIS-text-xlarge', help='TRELLIS 모델 경로 혹은 HF 모델명')
     parser.add_argument('--config', help='YAML 설정 경로 (미지정 시 기본 설정 사용)')
     parser.add_argument('--output', default='./outputs', help='이번 실행 출력 디렉토리')
+    parser.add_argument('--run_dir', help='run 출력 디렉토리 (지정 시 output_base로 직접 사용)')
+    parser.add_argument('--run_id', help='run ID (generation.json / GLB meta에 기록)')
     parser.add_argument('--base_output', default='/mnt/nas/tmp/nayeon', help='TrellisInferenceCore 기본 출력 베이스 경로')
     parser.add_argument('--usd_root', help='USD 프로젝트 루트 (usd_file_path 미지정 시 scene canonical 경로 유도용)')
     parser.add_argument('--target', choices=['object', 'actor', 'all'], default='object', help='JSON에서 추출할 타겟 유형 (기본: object)')
@@ -201,6 +242,10 @@ def main():
     usd_root = Path(args.usd_root).expanduser().resolve() if args.usd_root else None
 
     manager = TrellisInferenceCore(model_path=args.model_path, base_output_dir=args.base_output)
+    if args.run_id:
+        manager.run_id = args.run_id
+
+    output_dir = args.run_dir or args.output
 
     if args.config:
         config = manager.load_yaml_config(args.config)
@@ -223,6 +268,7 @@ def main():
             use_json_seed=args.seed_from_json,
             llm_label=args.llm_label,
             usd_root=usd_root,
+            run_id=args.run_id,
         )
     except Exception as exc:
         logging.error("❌ JSON 로딩 실패: %s", exc)
@@ -241,7 +287,7 @@ def main():
         return 1
 
     try:
-        manager.process_batch_from_records(records, config, args.output)
+        manager.process_batch_from_records(records, config, output_dir)
     except Exception as exc:
         logging.error("❌ 배치 처리 중 오류: %s", exc)
         return 1

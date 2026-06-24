@@ -9,7 +9,7 @@ Usage: run_usd_to_3D_object.sh <usd_file> <output_dir> [--model <trellis_model>]
 
 Arguments:
   --model <model_path>   TRELLIS 모델 경로 또는 HF 모델명 (예: microsoft/TRELLIS-text-large)
-  --translate            1단계 번역 활성화 (한국어 → 영어 번역)
+  --translate            1단계 번역 활성화 (USD ko → LLM 영어 번역; 미지정 시 USD en 직접 사용)
   --filter               2단계 필터링 활성화 (프롬프트 증강)
 
 Environment variables:
@@ -21,12 +21,13 @@ Environment variables:
   TRELLIS_BASE_OUTPUT    TrellisInferenceCore base_output (기본: /mnt/sdb_1TB/previz/text_to_3d)
   TRELLIS_CONFIG         TRELLIS YAML 설정 경로 (미지정 시 기본 설정 사용)
 
-JSON 경로는 자동 생성됩니다: {output_dir}/{model_name}/{YYYYMMDD}/usd_results.json
+JSON 경로는 자동 생성됩니다: {output_dir}/{model_name}/{YYYYMMDD}/run_{HHMMSS}_{flags}/usd_results.json
 
-참고: 기본적으로 LLM 번역은 실행되지 않습니다. --translate 또는 --filter 옵션을 사용하여 활성화하세요.
+참고: 기본 실행은 USD customData의 en 필드를 TRELLIS 프롬프트로 사용합니다.
+      --translate 를 붙이면 ko 필드를 LLM으로 번역합니다. --filter 는 영어 프롬프트를 증강합니다.
 
 예시:
-  # 기본 실행 (LLM 번역 없이 USD 파싱만 수행)
+  # 기본 실행 (USD en 직접 사용, LLM 없음)
   ./run_usd_to_3D_object.sh scene.usda /mnt/output
 
   # 1단계 번역만 활성화
@@ -196,16 +197,66 @@ trap cleanup EXIT INT TERM
 
 # 모델명에서 마지막 부분만 추출 (microsoft/TRELLIS-text-xlarge -> TRELLIS-text-xlarge)
 MODEL_NAME=$(basename "${TRELLIS_MODEL_PATH}")
-# 날짜 생성 (YYYYMMDD)
 CURRENT_DATE=$(date +%Y%m%d)
+CURRENT_TIME=$(date +%H%M%S)
 
-# JSON 경로 자동 생성: {output_dir}/{model_name}/{YYYYMMDD}/usd_results.json
-OUTPUT_JSON="${OUTPUT_DIR}/${MODEL_NAME}/${CURRENT_DATE}/usd_results.json"
+# run 폴더 flags: en | en-filter | ko-translate | ko-translate-filter
+if [[ "${ENABLE_TRANSLATE}" == "true" ]]; then
+  RUN_FLAGS="ko-translate"
+else
+  RUN_FLAGS="en"
+fi
+if [[ "${ENABLE_FILTER}" == "true" ]]; then
+  RUN_FLAGS="${RUN_FLAGS}-filter"
+fi
 
-# JSON 디렉토리 생성
-mkdir -p "$(dirname "${OUTPUT_JSON}")"
+RUN_ID="run_${CURRENT_TIME}_${RUN_FLAGS}"
+RUN_DIR="${OUTPUT_DIR}/${MODEL_NAME}/${CURRENT_DATE}/${RUN_ID}"
+OUTPUT_JSON="${RUN_DIR}/usd_results.json"
+DATE_DIR="${OUTPUT_DIR}/${MODEL_NAME}/${CURRENT_DATE}"
+
+mkdir -p "${RUN_DIR}"
+
+PIPELINE_CMD="${0} ${USD_FILE} ${OUTPUT_DIR}"
+[[ -n "${TRELLIS_MODEL_ARG}" ]] && PIPELINE_CMD+=" --model ${TRELLIS_MODEL_ARG}"
+[[ "${ENABLE_TRANSLATE}" == "true" ]] && PIPELINE_CMD+=" --translate"
+[[ "${ENABLE_FILTER}" == "true" ]] && PIPELINE_CMD+=" --filter"
+
+# run provenance 기록
+MANIFEST_PATH="${RUN_DIR}/run_manifest.json"
+RUN_ID="${RUN_ID}" USD_FILE="${USD_FILE}" TRELLIS_MODEL_PATH="${TRELLIS_MODEL_PATH}" \
+  ENABLE_TRANSLATE="${ENABLE_TRANSLATE}" ENABLE_FILTER="${ENABLE_FILTER}" PARSE_TYPE="${PARSE_TYPE}" \
+  OUTPUT_JSON="${OUTPUT_JSON}" RUN_DIR="${RUN_DIR}" MANIFEST_PATH="${MANIFEST_PATH}" \
+  PIPELINE_CMD="${PIPELINE_CMD}" \
+  python3 <<'PYMANIFEST'
+import json
+import os
+from datetime import datetime, timezone
+
+manifest = {
+    "run_id": os.environ["RUN_ID"],
+    "started_at": datetime.now(timezone.utc).astimezone().isoformat(),
+    "command": os.environ["PIPELINE_CMD"],
+    "usd_file": os.path.abspath(os.environ["USD_FILE"]),
+    "trellis_model": os.environ["TRELLIS_MODEL_PATH"],
+    "options": {
+        "translate": os.environ["ENABLE_TRANSLATE"] == "true",
+        "filter": os.environ["ENABLE_FILTER"] == "true",
+        "parse_type": os.environ["PARSE_TYPE"],
+    },
+    "output_json": os.path.abspath(os.environ["OUTPUT_JSON"]),
+    "run_dir": os.path.abspath(os.environ["RUN_DIR"]),
+}
+with open(os.environ["MANIFEST_PATH"], "w", encoding="utf-8") as f:
+    json.dump(manifest, f, ensure_ascii=False, indent=2)
+PYMANIFEST
+
+# latest -> 최신 run
+ln -sfn "${RUN_ID}" "${DATE_DIR}/latest"
 
 echo "🤖 TRELLIS model: ${TRELLIS_MODEL_PATH}"
+echo "📁 Run ID: ${RUN_ID}"
+echo "📁 Run 디렉토리: ${RUN_DIR}"
 echo "📁 JSON 저장 경로: ${OUTPUT_JSON}"
 
 # USD 파일의 기본 디렉토리 (원본 USD 파일들이 있는 위치)
@@ -228,12 +279,6 @@ fi
 if [[ ! -f "${USD_FILE}" ]]; then
   echo "❌ USD 파일을 찾을 수 없습니다: ${USD_FILE}"
   exit 1
-fi
-
-# 이전 실행의 JSON이 남아 있으면 1단계 실패 시에도 2단계가 stale 데이터로 진행될 수 있음
-if [[ -f "${OUTPUT_JSON}" ]]; then
-  echo "ℹ️ 기존 JSON 제거: ${OUTPUT_JSON}"
-  rm -f "${OUTPUT_JSON}"
 fi
 
 echo "🔄 1/2 USD 파싱 및 프롬프트 증강 실행"
@@ -268,7 +313,7 @@ fi
 
 echo "🔄 2/3 TRELLIS 추론 실행"
 # PYTHONPATH를 프로젝트 루트로 설정하여 trellis 모듈 import 가능하도록 함
-TRELLIS_CMD=(python "${TRELLIS_JSON_SCRIPT}" --json "${OUTPUT_JSON}" --output "${OUTPUT_DIR}" --model_path "${TRELLIS_MODEL_PATH}" --base_output "${TRELLIS_BASE_OUTPUT}" --usd_root "${USD_BASE_DIR}")
+TRELLIS_CMD=(python "${TRELLIS_JSON_SCRIPT}" --json "${OUTPUT_JSON}" --output "${RUN_DIR}" --run_dir "${RUN_DIR}" --run_id "${RUN_ID}" --model_path "${TRELLIS_MODEL_PATH}" --base_output "${TRELLIS_BASE_OUTPUT}" --usd_root "${USD_BASE_DIR}")
 if [[ -n "${TRELLIS_CONFIG:-}" ]]; then
   TRELLIS_CMD+=(--config "${TRELLIS_CONFIG}")
 fi
@@ -276,6 +321,7 @@ if [[ ${#TRELLIS_EXTRA_ARGS[@]} -gt 0 ]]; then
   TRELLIS_CMD+=("${TRELLIS_EXTRA_ARGS[@]}")
 fi
 echo "📌 ${TRELLIS_CMD[*]}"
+export RUN_ID="${RUN_ID}"
 PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}" "${TRELLIS_CMD[@]}"
 
 echo ""
@@ -304,6 +350,7 @@ import json
 import os
 import re
 import shutil
+from collections import defaultdict
 from pathlib import Path
 import subprocess
 import sys
@@ -312,7 +359,7 @@ json_path = Path("${OUTPUT_JSON}")
 usd_base_dir = Path("${USD_BASE_DIR}")
 merge_script = Path("${MERGE_SCRIPT}")
 script_dir = Path("${SCRIPT_DIR}")
-trellis_output_base = Path("${OUTPUT_DIR}") / "${MODEL_NAME}" / "${CURRENT_DATE}"
+trellis_output_base = Path("${RUN_DIR}")
 
 if not json_path.exists():
     print(f"❌ JSON 파일을 찾을 수 없습니다: {json_path}")
@@ -334,8 +381,37 @@ if not results:
 print(f"📊 총 {len(results)}개 항목 처리 중...")
 
 processed_count = 0
-skipped_count = 0
 error_count = 0
+skipped = defaultdict(list)
+
+SKIP_LABELS = {
+    "shot_override_meta_only": "shot override (scene canonical과 중복, geometry 상속)",
+    "no_path": "object_path/actor_path 없음",
+    "no_object_name": "object_name 추출 실패",
+    "no_usd": "원본 USD 파일 없음",
+    "no_scene_canonical": "shot 경로이나 scene canonical USD 없음",
+    "no_glb_dir": "GLB 디렉토리 없음",
+    "no_glb": "GLB 파일 없음 (3D 생성 실패 또는 미실행)",
+}
+
+
+def canonical_object_path(object_path: str) -> str:
+    parts = [p for p in object_path.replace('\\\\', '/').split('/') if p]
+    filtered = [p for p in parts if not re.match(r'^shot_\\w+$', p)]
+    return '/'.join(filtered) if filtered else object_path
+
+
+def track_skip(reason, path_key):
+    skipped[reason].append(path_key)
+
+
+def log_skip(idx, total, reason, path_key, detail=None):
+    label = SKIP_LABELS.get(reason, reason)
+    msg = f"ℹ️ [{idx}/{total}] 건너뜀 — {label}: {path_key}"
+    if detail:
+        msg += f" ({detail})"
+    print(msg)
+    track_skip(reason, path_key)
 
 
 def resolve_original_usd(item, path_key, object_name):
@@ -405,19 +481,18 @@ def find_glb_fallback(object_name, path_key):
 
 
 for idx, item in enumerate(results, 1):
-    # Scene canonical만 GLB→USD 변환/주입 (스펙 2.1, #3)
-    # shot override / meta-only 항목은 scene canonical reference로 geometry를 상속하므로 건너뜁니다.
-    if item.get('object_scope') == 'shot' or item.get('_pipeline') == 'meta_only':
-        skipped_count += 1
-        continue
-
+    total = len(results)
     object_path = item.get('object_path', '')
     actor_path = item.get('actor_path', '')
     path_key = object_path if object_path else actor_path
 
+    # Scene canonical만 GLB→USD 변환/주입 (스펙 2.1, #3)
+    if item.get('object_scope') == 'shot' or item.get('_pipeline') == 'meta_only':
+        track_skip("shot_override_meta_only", path_key or item.get('object_name', '?'))
+        continue
+
     if not path_key:
-        print(f"⚠️ [{idx}/{len(results)}] object_path/actor_path가 없어 건너뜁니다.")
-        skipped_count += 1
+        log_skip(idx, total, "no_path", item.get('object_name') or item.get('object_id') or '?')
         continue
 
     # object_name 추출 (예: scene_1/object_1 -> object_1)
@@ -429,15 +504,13 @@ for idx, item in enumerate(results, 1):
             parts[-1] if parts else None,
         )
     if not object_name:
-        print(f"⚠️ [{idx}/{len(results)}] object_name을 추출할 수 없습니다: {path_key}")
-        skipped_count += 1
+        log_skip(idx, total, "no_object_name", path_key)
         continue
 
     # 원본 USD 경로 확정
     original_usd = resolve_original_usd(item, path_key, object_name)
     if not original_usd:
-        print(f"⚠️ [{idx}/{len(results)}] 원본 USD 파일을 찾을 수 없습니다: {path_key}")
-        skipped_count += 1
+        log_skip(idx, total, "no_usd", path_key)
         continue
 
     # scene canonical 우선 (#8): shot override 경로면 scene canonical로 정규화
@@ -449,8 +522,7 @@ for idx, item in enumerate(results, 1):
             print(f"⚠️ [{idx}/{len(results)}] shot 경로를 scene canonical로 정규화: {canonical}")
             original_usd = canonical
         else:
-            print(f"⚠️ [{idx}/{len(results)}] shot 경로이나 scene canonical을 찾을 수 없어 건너뜁니다: {original_usd}")
-            skipped_count += 1
+            log_skip(idx, total, "no_scene_canonical", path_key, str(original_usd))
             continue
 
     # GLB 파일은 원본 USD 옆 assets/{object_name} 폴더에 있음
@@ -472,12 +544,10 @@ for idx, item in enumerate(results, 1):
             glb_file = dest_glb
             print(f"ℹ️ [{idx}/{len(results)}] TRELLIS 출력에서 GLB 복사: {fallback_glb} → {dest_glb}")
         elif not glb_dir.exists():
-            print(f"⚠️ [{idx}/{len(results)}] GLB 디렉토리를 찾을 수 없습니다: {glb_dir}")
-            skipped_count += 1
+            log_skip(idx, total, "no_glb_dir", path_key, str(glb_dir))
             continue
         else:
-            print(f"⚠️ [{idx}/{len(results)}] GLB 파일을 찾을 수 없습니다: {glb_dir}")
-            skipped_count += 1
+            log_skip(idx, total, "no_glb", path_key, str(glb_dir))
             continue
 
     print(f"🔄 [{idx}/{len(results)}] GLB → USD 변환 및 원본 주입: {glb_file.name}")
@@ -493,7 +563,7 @@ for idx, item in enumerate(results, 1):
                 str(original_usd)
             ],
             cwd=str(script_dir),
-            env={**os.environ, 'PYTHONPATH': f"{script_dir}:{os.environ.get('PYTHONPATH', '')}"},
+            env={**os.environ, 'PYTHONPATH': f"{script_dir}:{os.environ.get('PYTHONPATH', '')}", 'RUN_ID': "${RUN_ID}"},
             capture_output=True,
             text=True,
             check=True
@@ -508,7 +578,15 @@ for idx, item in enumerate(results, 1):
 print("")
 print(f"📊 처리 완료:")
 print(f"   ✅ 성공: {processed_count}개")
-print(f"   ⚠️ 건너뜀: {skipped_count}개")
+skipped_total = sum(len(paths) for paths in skipped.values())
+print(f"   ⚠️ 건너뜀: {skipped_total}개")
+if skipped:
+    for reason, paths in skipped.items():
+        print(f"      - {SKIP_LABELS.get(reason, reason)}: {len(paths)}개")
+        if reason == "shot_override_meta_only":
+            continue
+        for path in paths:
+            print(f"          · {path}")
 print(f"   ❌ 오류: {error_count}개")
 EOF
 fi

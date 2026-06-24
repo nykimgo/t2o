@@ -490,6 +490,7 @@ def _write_generated_asset_metadata(
     original_dir: Path,
     geometry_usd: Path,
     glb_file: Optional[Path] = None,
+    run_id: Optional[str] = None,
 ) -> None:
     """object_n.usda customData에 생성 에셋 경로(source_glb, geometry_usd)를 기록합니다."""
     geometry_rel = _relative_asset_path(original_dir, geometry_usd)
@@ -497,6 +498,8 @@ def _write_generated_asset_metadata(
     if glb_file is not None:
         glb_rel = _relative_asset_path(original_dir, glb_file)
         root_prim.SetCustomDataByKey('source_glb', Sdf.AssetPath(glb_rel))
+    if run_id:
+        root_prim.SetCustomDataByKey('t2o_run_id', run_id)
 
 
 def get_root_prim_name_from_usd(usd_file: Path) -> Optional[str]:
@@ -570,7 +573,10 @@ def inject_geometry_reference_into_original(
         refs.ClearReferences()
         refs.AddReference(ref_asset, f"/{geometry_prim_name}")
 
-        _write_generated_asset_metadata(root_prim, original_dir, geometry_usd, glb_file)
+        _write_generated_asset_metadata(
+            root_prim, original_dir, geometry_usd, glb_file,
+            run_id=os.environ.get('RUN_ID'),
+        )
 
         # 원본 파일에 직접 저장
         stage.GetRootLayer().Save()

@@ -408,6 +408,8 @@ movie_usds/
 logs/
 log.txt
 *.md
+!README.md
+t2o/
 dataset_toolkits/datasets/
 *.backup*
 *.backup
