@@ -7,6 +7,12 @@ from collections import defaultdict
 
 from bilingual import pick_lang
 from trellis_inference_core import TrellisInferenceCore
+try:
+    # v2 image-to-3D backend (TRELLIS.2 + FLUX). Import-guarded so the v1 path
+    # still works in envs where trellis2/o_voxel aren't installed.
+    from trellis2_inference_core import Trellis2InferenceCore
+except Exception:
+    Trellis2InferenceCore = None
 
 
 def _canonical_object_path(object_path: str) -> str:
@@ -223,8 +229,13 @@ def parse_args():
     parser.add_argument('--seed_from_json', action='store_true', help='JSON 내 seed가 있으면 사용')
     parser.add_argument('--llm_label', default='usd_aug', help='출력 구조에 표시할 LLM 라벨')
     parser.add_argument('--formats', nargs='+', default=['glb', 'ply', 'mp4', 'jpg'], help='저장할 출력 포맷')
-    parser.add_argument('--simplify', type=float, default=0.95, help='GLB 단순화 비율')
+    parser.add_argument('--simplify', type=float, default=0.95, help='GLB 단순화 비율 (v1 전용)')
     parser.add_argument('--texture_size', type=int, default=1024, help='텍스처 해상도')
+    parser.add_argument('--backend', choices=['trellis', 'trellis2'], default='trellis2',
+                        help='3D 생성 백엔드 (trellis=v1 text-to-3D, trellis2=v2 image-to-3D + FLUX)')
+    parser.add_argument('--t2i_model_path', default='/data/previs_object/t2o_pipeline/hf_models/FLUX.1-schnell',
+                        help='trellis2 백엔드의 Text→Image(FLUX) 모델 경로')
+    parser.add_argument('--pipeline_type', default=None, help='TRELLIS.2 pipeline_type (기본: 모델 default)')
     return parser.parse_args()
 
 
@@ -241,7 +252,21 @@ def main():
     target_filter = None if args.target == 'all' else args.target
     usd_root = Path(args.usd_root).expanduser().resolve() if args.usd_root else None
 
-    manager = TrellisInferenceCore(model_path=args.model_path, base_output_dir=args.base_output)
+    if args.backend == 'trellis2':
+        if Trellis2InferenceCore is None:
+            logging.error("❌ Trellis2InferenceCore를 불러올 수 없습니다 (trellis2 env에서 실행하세요).")
+            return 1
+        model_path = args.model_path
+        if model_path == 'microsoft/TRELLIS-text-xlarge':  # v1 기본값 → v2 로컬 모델
+            model_path = '/data/previs_object/t2o_pipeline/hf_models/TRELLIS.2-4B'
+        manager = Trellis2InferenceCore(
+            model_path=model_path,
+            base_output_dir=args.base_output,
+            t2i_model_path=args.t2i_model_path,
+            pipeline_type=args.pipeline_type,
+        )
+    else:
+        manager = TrellisInferenceCore(model_path=args.model_path, base_output_dir=args.base_output)
     if args.run_id:
         manager.run_id = args.run_id
 

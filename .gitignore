@@ -413,3 +413,14 @@ t2o/
 dataset_toolkits/datasets/
 *.backup*
 *.backup
+
+# TRELLIS.2 외부 소스 (6.5GB) — repo에 포함하지 않고 SHA 고정으로 별도 clone한다.
+#   git clone --recursive https://github.com/microsoft/TRELLIS.2.git trellis2_src
+#   cd trellis2_src && git checkout 75fbf0183001ed9876c8dbb35de6b68552ee08bd
+# 상세: NEW_SERVER_SETUP.md §3.1
+trellis2_src/
+
+# 위의 `*.md` 규칙 예외 — 프로젝트 문서는 추적한다
+!README.md
+!TRELLIS2_MIGRATION.md
+!NEW_SERVER_SETUP.md

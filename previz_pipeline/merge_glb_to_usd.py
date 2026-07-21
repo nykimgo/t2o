@@ -336,6 +336,12 @@ def postprocess_geometry_usd(usd_file: Path, object_name: Optional[str] = None) 
 def find_usd_from_gltf() -> Optional[str]:
     """
     usd_from_gltf 실행 파일의 경로를 찾습니다.
+
+    탐색 순서:
+      1) PATH
+      2) 프로젝트 루트 기준 상대 경로
+         (이 파일: t2o_pipeline/previz_pipeline/ → parents[2] = PREVIS_PROJ)
+      3) 레거시/공통 절대 경로
     """
     # 1. PATH에서 찾기
     result = subprocess.run(
@@ -348,8 +354,10 @@ def find_usd_from_gltf() -> Optional[str]:
         if path and os.path.exists(path):
             return path
 
-    # 2. 일반적인 설치 경로 확인
+    # 2. 프로젝트 루트(스크립트 기준) 및 일반 설치 경로
+    project_root = Path(__file__).resolve().parents[2]
     common_paths = [
+        str(project_root / 'usd_from_gltf_build' / 'bin' / 'usd_from_gltf'),
         '/root/previs_proj/usd_from_gltf_build/bin/usd_from_gltf',
         '/usr/local/bin/usd_from_gltf',
         '/usr/bin/usd_from_gltf',

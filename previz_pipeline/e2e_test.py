@@ -1,0 +1,44 @@
+"""E2E functional test for Trellis2InferenceCore.
+Exercises the full glue: prompt -> FLUX (subprocess/t2i env) -> TRELLIS.2 ->
+o_voxel to_glb (PNG). Uses FLUX.1-dev (already downloaded & working); schnell
+is a drop-in once its gate is accepted.
+Run in the trellis2 env with PYTHONPATH=previz_pipeline:trellis2_src.
+"""
+import os
+from pathlib import Path
+from trellis2_inference_core import Trellis2InferenceCore
+
+OUT = Path("/data/previs_object/t2o_pipeline/trellis2_src/smoke_out/e2e")
+OUT.mkdir(parents=True, exist_ok=True)
+
+core = Trellis2InferenceCore(
+    t2i_model_path="/data/previs_object/t2o_pipeline/hf_models/FLUX.1-dev",  # dev: functional test
+)
+# Minimal state normally set by _process_file_batch:
+core.run_id = "e2e_test"
+core.output_base = OUT
+
+core.load_pipeline()
+
+result = core._generate_single(
+    prompt="a worn leather armchair",
+    predefined_name="e2e_chair",
+    config={"seed": 42},
+    formats=["glb", "mp4"],
+    postprocessing_config={"texture_size": 2048, "simplify_target": 16777216},
+    llm_model="test",
+    record_context={
+        "scene": "e2e", "shot": "shot_unknown", "target_dir_name": "e2e_chair",
+        "target_type": "item", "object_name": "e2e_chair", "run_id": "e2e_test",
+    },
+)
+
+print("=== E2E RESULT ===")
+for k in ("success", "generation_time", "render_time", "save_time", "total_time", "save_path"):
+    print(f"  {k}: {result.get(k)}")
+print("  saved_files:")
+for f in result.get("saved_files", []):
+    sz = os.path.getsize(f) / 1e6 if os.path.exists(f) else 0
+    print(f"    {f}  ({sz:.2f} MB)")
+assert result.get("success") and any(f.endswith(".glb") for f in result.get("saved_files", [])), "E2E FAILED"
+print("E2E_OK")
