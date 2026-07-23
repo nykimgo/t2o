@@ -1,18 +1,23 @@
 """E2E functional test for Trellis2InferenceCore.
 Exercises the full glue: prompt -> FLUX (subprocess/t2i env) -> TRELLIS.2 ->
-o_voxel to_glb (PNG). Uses FLUX.1-dev (already downloaded & working); schnell
-is a drop-in once its gate is accepted.
+o_voxel to_glb (PNG). Uses FLUX.1-schnell (Apache-2.0), which is what the
+shipping configuration must use; the earlier dev-only run was a functional
+stand-in from before the schnell gate was accepted.
+To isolate a schnell-specific failure, point T2I_MODEL_PATH at FLUX.1-dev —
+dev is non-commercial and for diagnosis only.
 Run in the trellis2 env with PYTHONPATH=previz_pipeline:trellis2_src.
 """
 import os
 from pathlib import Path
 from trellis2_inference_core import Trellis2InferenceCore
 
-OUT = Path("/data/previs_object/t2o_pipeline/trellis2_src/smoke_out/e2e")
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+OUT = Path(os.environ.get("E2E_OUT", _REPO_ROOT / "t2o_results" / "smoke_out" / "e2e"))
 OUT.mkdir(parents=True, exist_ok=True)
 
 core = Trellis2InferenceCore(
-    t2i_model_path="/data/previs_object/t2o_pipeline/hf_models/FLUX.1-dev",  # dev: functional test
+    t2i_model_path=os.environ.get(
+        "T2I_MODEL_PATH", str(_REPO_ROOT / "hf_models" / "FLUX.1-schnell")),
 )
 # Minimal state normally set by _process_file_batch:
 core.run_id = "e2e_test"

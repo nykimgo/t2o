@@ -18,7 +18,7 @@ Environment variables:
   OLLAMA_BASE_URL        Ollama 서버 URL (기본: unset)
   PARSE_TYPE             usd_parse_and_augment 파싱 타입 (object|actor|both, 기본: object)
   TRELLIS_MODEL_PATH     TRELLIS 모델 경로 또는 HF 모델명 (기본: microsoft/TRELLIS-text-base)
-  TRELLIS_BASE_OUTPUT    TrellisInferenceCore base_output (기본: /mnt/sdb_1TB/previz/text_to_3d)
+  TRELLIS_BASE_OUTPUT    TrellisInferenceCore base_output (기본: 위 OUTPUT_DIR 인자)
   TRELLIS_CONFIG         TRELLIS YAML 설정 경로 (미지정 시 기본 설정 사용)
 
 JSON 경로는 자동 생성됩니다: {output_dir}/{model_name}/{YYYYMMDD}/run_{HHMMSS}_{flags}/usd_results.json

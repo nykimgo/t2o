@@ -12,9 +12,11 @@ Design
 * Subclasses ``TrellisInferenceCore`` to REUSE all path/naming/manifest/CSV/
   generation-json logic unchanged; only pipeline loading and the per-object
   generation+export+render are overridden.
-* GLB is exported with ``extension_webp=False`` (PNG textures) because the
-  bundled ``usd_from_gltf`` build supports only .png/.jpg (no EXT_texture_webp).
-  PBR metallic/roughness maps ARE glTF-core and convert fine.
+* GLB is exported with ``extension_webp=False`` (PNG textures) so the downstream
+  GLB->USD step gets plain .png/.jpg (no EXT_texture_webp). The converter is now
+  the native trimesh+pxr path (glb_to_usd_native.py), which also extracts jpg
+  textures — PNG/jpg keeps that simple and portable. PBR metallic/roughness maps
+  ARE glTF-core and convert fine.
 * HDRI .exr is read via the ``OpenEXR`` package (the installed
   opencv-python-headless is built with OpenEXR:NO). Render is best-effort.
 
@@ -26,13 +28,33 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+
+def _detect_cuda_arch(default: str = "8.0") -> str:
+    """Compute capability of GPU 0 as a TORCH_CUDA_ARCH_LIST value (e.g. '8.9').
+
+    Queried via nvidia-smi because this runs before ``import torch`` — the arch
+    list must be set before any JIT extension build. A100=8.0, RTX 4090=8.9,
+    H100=9.0. Falls back to ``default`` when nvidia-smi is unavailable.
+    """
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=10,
+        )
+        cap = out.stdout.strip().splitlines()[0].strip()
+        return cap if cap else default
+    except Exception:
+        return default
+
+
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "8.0")  # A100
+os.environ.setdefault("TORCH_CUDA_ARCH_LIST", _detect_cuda_arch())
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import numpy as np
@@ -65,13 +87,21 @@ except ImportError as e:  # pragma: no cover
     print("💡 trellis2_src 에서 실행하거나 PYTHONPATH를 설정하세요")
     TRELLIS2_AVAILABLE = False
 
+# Repo root (= <repo>/t2o_pipeline), derived so the same checkout works on any
+# server. Absolute paths here used to be pinned to the original host.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
 # Default HDRI for PBR preview render (best-effort only).
-_DEFAULT_HDRI = "/data/previs_object/t2o_pipeline/trellis2_src/assets/hdri/forest.exr"
+_DEFAULT_HDRI = str(_REPO_ROOT / "trellis2_src/assets/hdri/forest.exr")
 _AABB = [[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]]
 
-# FLUX runs in an isolated env (transformers<5) — invoked as a subprocess.
-_T2I_PYTHON = "/root/miniconda3/envs/t2i/bin/python"
-_T2I_SCRIPT = "/data/previs_object/t2o_pipeline/previz_pipeline/text_to_image.py"
+# FLUX runs in an isolated env — invoked as a subprocess. The t2i env is a
+# sibling of the active (trellis2) env under <conda>/envs/; override with
+# T2I_PYTHON / T2I_SCRIPT if the layout differs.
+_T2I_PYTHON = os.environ.get(
+    "T2I_PYTHON", str(Path(sys.prefix).parent / "t2i" / "bin" / "python"))
+_T2I_SCRIPT = os.environ.get(
+    "T2I_SCRIPT", str(_REPO_ROOT / "previz_pipeline" / "text_to_image.py"))
 
 
 def _read_exr_rgb(path: str) -> np.ndarray:
@@ -86,9 +116,10 @@ class Trellis2InferenceCore(TrellisInferenceCore):
 
     def __init__(
         self,
-        model_path: str = "/data/previs_object/t2o_pipeline/hf_models/TRELLIS.2-4B",
-        base_output_dir: str = "/mnt/nas/tmp/nayeon",
-        t2i_model_path: str = "/data/previs_object/t2o_pipeline/hf_models/FLUX.1-schnell",
+        model_path: str = str(_REPO_ROOT / "hf_models" / "TRELLIS.2-4B"),
+        base_output_dir: str = os.environ.get(
+            "TRELLIS_BASE_OUTPUT", str(_REPO_ROOT / "t2o_results")),
+        t2i_model_path: str = str(_REPO_ROOT / "hf_models" / "FLUX.1-schnell"),
         hdri_path: str = _DEFAULT_HDRI,
         pipeline_type: Optional[str] = None,   # None -> model default '1024_cascade'
     ) -> None:
@@ -123,8 +154,14 @@ class Trellis2InferenceCore(TrellisInferenceCore):
     def _t2i_generate(self, prompt: str, seed: int, out_path: str) -> Image.Image:
         """Run FLUX in the isolated ``t2i`` env (subprocess) and load the PNG.
 
-        Kept out-of-process because FLUX needs transformers<5 while TRELLIS.2
-        needs transformers 5.x — the two cannot share one interpreter.
+        Kept out-of-process because FLUX and TRELLIS.2 need different
+        transformers versions — the two cannot share one interpreter.
+
+        VRAM: schnell in bf16 barely fits a 24GB card even with CPU offload
+        (measured ~23.4GB peak on an empty 4090). TRELLIS.2 is already resident
+        here, so sharing the card OOMs. Set ``T2I_GPU`` to hand FLUX its own
+        device; on a single-GPU box leave it unset and the two stages must be
+        split into separate runs instead.
         """
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         cmd = [
@@ -132,8 +169,15 @@ class Trellis2InferenceCore(TrellisInferenceCore):
             "--prompt", prompt, "--out", out_path,
             "--seed", str(int(seed)), "--model", self.t2i_model_path,
         ]
-        logging.info(f"🎨 T2I (subprocess/t2i env): {prompt[:60]}")
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        env = {**os.environ, "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"}
+        t2i_gpu = os.environ.get("T2I_GPU")
+        if t2i_gpu:
+            # The subprocess then sees it as cuda:0 regardless of the index.
+            env["CUDA_VISIBLE_DEVICES"] = t2i_gpu
+            logging.info(f"🎨 T2I (subprocess/t2i env, GPU {t2i_gpu}): {prompt[:60]}")
+        else:
+            logging.info(f"🎨 T2I (subprocess/t2i env): {prompt[:60]}")
+        proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if proc.returncode != 0 or not os.path.exists(out_path):
             raise RuntimeError(f"T2I subprocess failed (rc={proc.returncode}):\n{proc.stderr[-1500:]}")
         return Image.open(out_path).convert("RGB")
@@ -208,7 +252,7 @@ class Trellis2InferenceCore(TrellisInferenceCore):
                 logging.warning(f"⚠️ PBR render failed (skipping): {e}")
         render_time = time.time() - render_start
 
-        # --- Stage D: export GLB (PNG textures for usd_from_gltf compat) + previews ---
+        # --- Stage D: export GLB (PNG textures for portable GLB->USD) + previews ---
         saved_files: List[str] = []
         glb_path_saved: Optional[Path] = None
         save_start = time.time()

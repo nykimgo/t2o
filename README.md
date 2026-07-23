@@ -12,7 +12,8 @@
 │       └── hidden_time.usda
 ├── space_generation/               # 공간(배경) 생성
 ├── intent_analyzer/                # 의도 분석 → USD 생성
-├── usd_from_gltf/                  # GLB→USD 변환 (Stage 3 필수)
+│                                   # (usd_from_gltf 모듈은 더 이상 불필요 —
+│                                   #  Stage 3 변환이 trimesh+pxr 네이티브로 대체됨)
 └── t2o_pipeline/                   # ← 이 저장소 (객체 3D 생성)
     ├── run_usd_to_3D_object.sh
     ├── previz_pipeline/
@@ -115,7 +116,7 @@ cd /root/previs_proj
 
   * **Role:** GLB를 USD geometry로 변환·수리(Patching)하고, **원본 `object_n.usda`에 geometry reference를 직접 주입**합니다.
   * **Script:** `previz_pipeline/merge_glb_to_usd.py`
-      * **Conversion:** `usd_from_gltf`로 `.glb` $\to$ `.geometry.usda` 변환 (assets 폴더에 생성).
+      * **Conversion:** 네이티브 변환기 `previz_pipeline/glb_to_usd_native.py`(trimesh + pxr)로 `.glb` $\to$ `.geometry.usda` 변환 (assets 폴더에 생성). ~~`usd_from_gltf`~~ 레거시 바이너리 의존을 제거함 — 추가 설치 불필요.
       * **Texture Renaming:** `bin/` 텍스처에 object_name을 부여하여 충돌 방지 (`bin/image0.jpg` $\to$ `bin/texture_{object_name}_0.jpg`).
       * **Path Fixing:** USD 내부 텍스처 경로를 상대 경로(`./bin/...`)로 통일.
       * **UV Fix:** PrimvarReader의 UV 이름을 `st0` $\to$ 표준 `st`로 변경 (Blender 호환성).
@@ -180,9 +181,9 @@ t2o_results/TRELLIS-text-base/20260624/
 
 #### ✅ 1. 사전 요구 사항 (Prerequisites)
 
-  * **Python 환경:** `pxr` (USD), `torch`, `trellis`, `ollama`, `imageio`, `Pillow` 라이브러리가 설치되어 있어야 합니다.
+  * **Python 환경:** `pxr` (usd-core), `torch`, `trellis`/`trellis2`, `trimesh`, `ollama`, `imageio`, `Pillow` 라이브러리가 설치되어 있어야 합니다. Stage 3(GLB→USD) 변환은 `trimesh` + `pxr` 로만 동작합니다.
   * **외부 툴:**
-      * **usd\_from\_gltf:** 시스템 PATH 또는 일반 설치 경로에 있어야 합니다 (GLB→USD 변환에 필수).
+      * ~~**usd\_from\_gltf**~~ — **더 이상 필요 없습니다.** GLB→USD 변환이 네이티브(`glb_to_usd_native.py`)로 대체되었습니다. 레거시 바이너리 빌드/설치 불필요.
       * **Ollama:** `--translate` 또는 `--filter` 사용 시에만 필요합니다. 스크립트가 자동으로 `ollama serve`를 시작/종료합니다.
   * **TRELLIS 모델:** `run_usd_to_3D_object.sh` 기본값은 `microsoft/TRELLIS-text-base`입니다. HF 모델은 프로젝트 루트 `hf_models/`에 캐시되며, 로컬에 없으면 자동 다운로드됩니다.
 

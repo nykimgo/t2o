@@ -161,8 +161,9 @@ def _source_texture_index(stem: str) -> Optional[int]:
 
 def rename_texture_files(usd_file: Path, object_name: str) -> Dict[str, str]:
     """
-    usd_from_gltf가 bin/에 생성한 원본 텍스처(image0.jpg 등)만
-    texture_{object_name}_{N}.jpg 로 정규화합니다.
+    변환기가 bin/에 생성한 원본 텍스처(image0.jpg 등)만
+    texture_{object_name}_{N}.jpg 로 정규화합니다. (네이티브 변환기는 이미
+    이 이름으로 만들어 매칭되지 않으므로 아무 것도 바꾸지 않는다 — 무해.)
 
     object마다 독립된 assets/.../bin/ 을 쓰므로, 같은 scene 내
     object 간 충돌은 없습니다. imageN → _N 매핑 후 동일 경로는 덮어씁니다.
@@ -231,7 +232,7 @@ def rename_texture_files(usd_file: Path, object_name: str) -> Dict[str, str]:
 
 def postprocess_geometry_usd(usd_file: Path, object_name: Optional[str] = None) -> None:
     """
-    usd_from_gltf가 생성한 geometry USD에 대해 후처리 (pxr 기반):
+    변환된 geometry USD에 대해 후처리 (pxr 기반):
       1) 텍스처 파일명을 object_name을 포함한 고유한 이름으로 변경 (bin/ 폴더)
       2) UsdPrimvarReader_float2 의 inputs:varname 'st0' → 'st'
       3) 텍스처 경로를 './bin/파일명' 또는 './파일명' 형태의 상대 경로로 통일
@@ -330,89 +331,8 @@ def postprocess_geometry_usd(usd_file: Path, object_name: Optional[str] = None) 
 
 
 # ---------------------------------------------------------------------------
-# usd_from_gltf 실행 파일 탐색
+# GLB → USD 변환 (네이티브 trimesh + pxr, glb_to_usd_native 모듈 위임)
 # ---------------------------------------------------------------------------
-
-def find_usd_from_gltf() -> Optional[str]:
-    """
-    usd_from_gltf 실행 파일의 경로를 찾습니다.
-
-    탐색 순서:
-      1) PATH
-      2) 프로젝트 루트 기준 상대 경로
-         (이 파일: t2o_pipeline/previz_pipeline/ → parents[2] = PREVIS_PROJ)
-      3) 레거시/공통 절대 경로
-    """
-    # 1. PATH에서 찾기
-    result = subprocess.run(
-        ['which', 'usd_from_gltf'],
-        capture_output=True,
-        text=True
-    )
-    if result.returncode == 0:
-        path = result.stdout.strip()
-        if path and os.path.exists(path):
-            return path
-
-    # 2. 프로젝트 루트(스크립트 기준) 및 일반 설치 경로
-    project_root = Path(__file__).resolve().parents[2]
-    common_paths = [
-        str(project_root / 'usd_from_gltf_build' / 'bin' / 'usd_from_gltf'),
-        '/root/previs_proj/usd_from_gltf_build/bin/usd_from_gltf',
-        '/usr/local/bin/usd_from_gltf',
-        '/usr/bin/usd_from_gltf',
-        os.path.expanduser('~/usd_from_gltf_build/bin/usd_from_gltf'),
-    ]
-
-    for path in common_paths:
-        if os.path.exists(path):
-            return path
-
-    return None
-
-
-# ---------------------------------------------------------------------------
-# GLB → USD 변환 + 루트 프림 이름 처리
-# ---------------------------------------------------------------------------
-
-def rename_root_prim_in_usd(usd_file: Path, new_name: str) -> bool:
-    """
-    USD 파일의 defaultPrim(루트 프리미티브) 이름을 변경합니다. (pxr 기반)
-
-    - defaultPrim 을 가져와서 SetName(new_name)을 호출하고,
-      stage.SetDefaultPrim(...) 으로 다시 지정합니다.
-    """
-    try:
-        stage = Usd.Stage.Open(str(usd_file))
-        if not stage:
-            print(f"⚠️ Stage를 열 수 없습니다: {usd_file}")
-            return False
-
-        default_prim = stage.GetDefaultPrim()
-        if not default_prim:
-            print(f"⚠️ defaultPrim을 찾을 수 없습니다. 수동 확인이 필요할 수 있습니다.")
-            return False
-
-        old_name = default_prim.GetName()
-        if old_name == new_name:
-            # 이미 원하는 이름
-            return True
-
-        ok = default_prim.SetName(new_name)
-        if not ok:
-            print(f"⚠️ 루트 프리미티브 이름 변경 실패(SetName 실패): {old_name} → {new_name}")
-            return False
-
-        stage.SetDefaultPrim(default_prim)
-        stage.GetRootLayer().Save()
-
-        print(f"✅ 루트 프리미티브 이름 변경(pxr): {old_name} → {new_name}")
-        return True
-
-    except Exception as e:
-        print(f"⚠️ 루트 프리미티브 이름 변경 실패: {e}")
-        return False
-
 
 def convert_glb_to_usd(
     glb_file: Path,
@@ -426,54 +346,39 @@ def convert_glb_to_usd(
     Args:
         glb_file: 입력 GLB 파일 경로
         output_usd: 출력 USD 파일 경로
-        root_prim_name: 루트 프리미티브 이름 (None이면 usd_from_gltf 기본값 사용)
-        object_name: object 이름 (텍스처 파일명 변경에 사용)
+        root_prim_name: 루트 프리미티브 이름 (None이면 object_name 사용)
+        object_name: object 이름 (텍스처 파일명에 사용)
     """
     try:
-        print(f"🔄 GLB → USD 변환 중...")
+        print(f"🔄 GLB → USD 변환 중 (trimesh + pxr, 네이티브)...")
         print(f"   입력: {glb_file}")
         print(f"   출력: {output_usd}")
 
-        usd_from_gltf_path = find_usd_from_gltf()
-        if not usd_from_gltf_path:
-            print(f"❌ usd_from_gltf 실행 파일을 찾을 수 없습니다.")
-            print(f"   PATH에 추가하거나 직접 경로를 설정해주세요.")
-            return False
+        # usd_from_gltf(빌드 지옥·업데이트 종료) 대신 순수 파이썬 변환기를 쓴다.
+        # TRELLIS.2 출력은 항상 단일 메시 + PBR 텍스처 형태라 이걸로 충분하며,
+        # 출력 USD 계층을 usd_from_gltf 와 구조적으로 동일하게 맞춰 뒀다.
+        # 추가 의존성 없음(trimesh/pxr 은 trellis2 env 에 이미 있음).
+        from glb_to_usd_native import convert as _native_convert
 
-        print(f"   사용 중: {usd_from_gltf_path}")
-
-        # 출력 디렉토리 생성
         output_usd.parent.mkdir(parents=True, exist_ok=True)
-
-        result = subprocess.run(
-            [usd_from_gltf_path, str(glb_file), str(output_usd)],
-            capture_output=True,
-            text=True,
-            check=True
+        _, actual_root = _native_convert(
+            str(glb_file), str(output_usd),
+            root_prim_name=(root_prim_name or object_name or "object"),
+            texture_object_name=object_name,
         )
+        print(f"✅ 변환 완료: {output_usd}  (root=/{actual_root})")
 
-        if result.stdout:
-            print(result.stdout)
-        if result.stderr:
-            print(result.stderr)
-
-        print(f"✅ 변환 완료: {output_usd}")
-
-        # 루트 프리미티브 이름 변경
-        if root_prim_name:
-            rename_root_prim_in_usd(output_usd, root_prim_name)
-
-        # geometry USD 후처리 (UV/텍스처)
+        # geometry USD 후처리 (UV/텍스처 경로 정규화).
+        # 네이티브 변환기는 이미 './bin/...' 형태로 만들지만, 일관성을 위해
+        # 그대로 태운다(이미 정규화돼 있으면 '불필요'로 넘어간다).
         postprocess_geometry_usd(output_usd, object_name)
 
         return True
 
-    except subprocess.CalledProcessError as e:
-        print(f"❌ usd_from_gltf 실행 실패:")
-        print(f"   {e.stderr}")
-        return False
     except Exception as e:
-        print(f"❌ 변환 중 오류 발생: {e}")
+        import traceback
+        print(f"❌ GLB → USD 변환 실패: {e}")
+        traceback.print_exc()
         return False
 
 

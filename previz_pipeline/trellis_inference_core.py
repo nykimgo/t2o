@@ -31,7 +31,10 @@ except ImportError as e:
 class TrellisInferenceCore:
     """TRELLIS model-based 3D generation core functionality for record-based processing"""
     
-    def __init__(self, model_path: str = "microsoft/TRELLIS-text-xlarge", base_output_dir: str = "/mnt/nas/tmp/nayeon"):
+    def __init__(self, model_path: str = "microsoft/TRELLIS-text-xlarge",
+                 base_output_dir: str = os.environ.get(
+                     "TRELLIS_BASE_OUTPUT",
+                     str(Path(__file__).resolve().parents[1] / "t2o_results"))):
         """
         Args:
             model_path: TRELLIS model path (local path or HuggingFace model name)

@@ -1,9 +1,16 @@
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
+
+# Repo-relative defaults so the same checkout runs on any server.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_HF_MODELS = _REPO_ROOT / 'hf_models'
+_DEFAULT_BASE_OUTPUT = os.environ.get(
+    'TRELLIS_BASE_OUTPUT', str(_REPO_ROOT / 't2o_results'))
 
 from bilingual import pick_lang
 from trellis_inference_core import TrellisInferenceCore
@@ -83,26 +90,41 @@ def _derive_scene_canonical_usd_path(item: Dict[str, Any], usd_root: Optional[Pa
     return str(candidate.resolve())
 
 
-def _build_default_config(seed: Any, formats: List[str]) -> Dict[str, Any]:
-    return {
-        'generation': {
-            'seed': seed,
-            'sparse_structure_sampler_params': {
-                'steps': 12,
-                'cfg_strength': 7.5
-            },
-            'slat_sampler_params': {
-                'steps': 12,
-                'cfg_strength': 7.5
-            }
-        },
-        'output': {
-            'formats': formats
-        },
-        'postprocessing': {
-            'simplify': 0.95,
-            'texture_size': 1024
+def _build_default_config(seed: Any, formats: List[str],
+                          backend: str = 'trellis2') -> Dict[str, Any]:
+    """백엔드별 기본 생성 설정.
+
+    v1 과 v2 는 샘플러 파라미터의 이름과 개수가 다르다. v1 설정을 v2 로 그대로
+    넘기면 `SparseStructureFlowModel.forward() got an unexpected keyword
+    argument 'cfg_strength'` 로 죽는다.
+
+      v1: slat_sampler_params            / cfg_strength
+      v2: shape_slat_sampler_params
+          + tex_slat_sampler_params      / guidance_strength
+
+    v2 는 샘플러 파라미터를 비워 모델 기본값을 쓴다 — E2E 로 검증된 유일한 구성이
+    그것이다(previz_pipeline/e2e_test.py). v1 의 cfg_strength=7.5 를 v2 의
+    guidance_strength(기본 3.0)로 옮겨 적을 근거가 없어 옮기지 않았다.
+    튜닝이 필요하면 v2 키 이름으로 명시할 것.
+    """
+    generation: Dict[str, Any] = {'seed': seed}
+    if backend != 'trellis2':
+        generation['sparse_structure_sampler_params'] = {
+            'steps': 12, 'cfg_strength': 7.5,
         }
+        generation['slat_sampler_params'] = {
+            'steps': 12, 'cfg_strength': 7.5,
+        }
+
+    postprocessing: Dict[str, Any] = {'texture_size': 1024}
+    if backend != 'trellis2':
+        # v1 은 비율(0.95), v2 는 목표 face 수(simplify_target)라 의미가 다르다.
+        postprocessing['simplify'] = 0.95
+
+    return {
+        'generation': generation,
+        'output': {'formats': formats},
+        'postprocessing': postprocessing,
     }
 
 
@@ -219,7 +241,7 @@ def parse_args():
     parser.add_argument('--output', default='./outputs', help='이번 실행 출력 디렉토리')
     parser.add_argument('--run_dir', help='run 출력 디렉토리 (지정 시 output_base로 직접 사용)')
     parser.add_argument('--run_id', help='run ID (generation.json / GLB meta에 기록)')
-    parser.add_argument('--base_output', default='/mnt/nas/tmp/nayeon', help='TrellisInferenceCore 기본 출력 베이스 경로')
+    parser.add_argument('--base_output', default=_DEFAULT_BASE_OUTPUT, help='TrellisInferenceCore 기본 출력 베이스 경로')
     parser.add_argument('--usd_root', help='USD 프로젝트 루트 (usd_file_path 미지정 시 scene canonical 경로 유도용)')
     parser.add_argument('--target', choices=['object', 'actor', 'all'], default='object', help='JSON에서 추출할 타겟 유형 (기본: object)')
     parser.add_argument('--max_items', type=int, help='처리할 최대 항목 수')
@@ -233,7 +255,7 @@ def parse_args():
     parser.add_argument('--texture_size', type=int, default=1024, help='텍스처 해상도')
     parser.add_argument('--backend', choices=['trellis', 'trellis2'], default='trellis2',
                         help='3D 생성 백엔드 (trellis=v1 text-to-3D, trellis2=v2 image-to-3D + FLUX)')
-    parser.add_argument('--t2i_model_path', default='/data/previs_object/t2o_pipeline/hf_models/FLUX.1-schnell',
+    parser.add_argument('--t2i_model_path', default=str(_HF_MODELS / 'FLUX.1-schnell'),
                         help='trellis2 백엔드의 Text→Image(FLUX) 모델 경로')
     parser.add_argument('--pipeline_type', default=None, help='TRELLIS.2 pipeline_type (기본: 모델 default)')
     return parser.parse_args()
@@ -258,7 +280,7 @@ def main():
             return 1
         model_path = args.model_path
         if model_path == 'microsoft/TRELLIS-text-xlarge':  # v1 기본값 → v2 로컬 모델
-            model_path = '/data/previs_object/t2o_pipeline/hf_models/TRELLIS.2-4B'
+            model_path = str(_HF_MODELS / 'TRELLIS.2-4B')
         manager = Trellis2InferenceCore(
             model_path=model_path,
             base_output_dir=args.base_output,
@@ -278,8 +300,11 @@ def main():
             logging.error("❌ YAML 설정을 불러오지 못했습니다.")
             return 1
     else:
-        config = _build_default_config(args.seed, args.formats)
-        config['postprocessing']['simplify'] = args.simplify
+        config = _build_default_config(args.seed, args.formats, args.backend)
+        if args.backend != 'trellis2':
+            # v2 는 이 키를 읽지 않는다(simplify_target 을 쓴다). 넣어두면 적용되는
+            # 것처럼 보여 오해를 부른다.
+            config['postprocessing']['simplify'] = args.simplify
         config['postprocessing']['texture_size'] = args.texture_size
 
     try:

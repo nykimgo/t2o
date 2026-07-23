@@ -34,7 +34,12 @@ import torch
 from PIL import Image
 
 _MODEL_ID = "black-forest-labs/FLUX.1-schnell"
-_LOCAL_DEFAULT = "/data/previs_object/t2o_pipeline/hf_models/FLUX.1-schnell"
+# Cards below this get per-module CPU offload instead of full residency.
+# schnell bf16 needs ~30GB resident; 24GB cards OOM without offload.
+_OFFLOAD_VRAM_THRESHOLD_GB = float(os.environ.get("T2I_OFFLOAD_THRESHOLD_GB", "40"))
+# Derived from the repo location so the same checkout works on any server.
+_LOCAL_DEFAULT = str(
+    Path(__file__).resolve().parents[1] / "hf_models" / "FLUX.1-schnell")
 
 # Prompt scaffolding tuned for single-object, image-to-3D friendly renders.
 _POSITIVE_SUFFIX = (
@@ -72,10 +77,34 @@ class TextToImage:
         src = self.model_path if os.path.exists(self.model_path) else _MODEL_ID
         logging.info(f"🔄 Loading FLUX.1-schnell from: {src}")
         self.pipe = FluxPipeline.from_pretrained(src, torch_dtype=self.dtype)
-        self.pipe.to(self.device)
+
+        # Residency: schnell in bf16 (12B transformer + T5-XXL) needs ~30GB to sit
+        # on the card. That fits an 80GB A100 but OOMs a 24GB 4090 — measured:
+        # "23.48 GiB in use" on an otherwise-empty card. So offload per-module
+        # through CPU when the card is small, and keep the faster all-resident
+        # path when there is headroom. T2I_OFFLOAD=1/0 forces either way.
+        offload_env = os.environ.get("T2I_OFFLOAD")
+        if offload_env is not None:
+            offload = offload_env.strip().lower() in ("1", "true", "yes")
+        elif self.device.startswith("cuda") and torch.cuda.is_available():
+            idx = torch.cuda.current_device()
+            total_gb = torch.cuda.get_device_properties(idx).total_memory / (1024 ** 3)
+            offload = total_gb < _OFFLOAD_VRAM_THRESHOLD_GB
+            logging.info(f"ℹ️ GPU VRAM {total_gb:.1f} GB "
+                         f"(offload 임계 {_OFFLOAD_VRAM_THRESHOLD_GB} GB)")
+        else:
+            offload = False
+
+        if offload:
+            # Moves each submodule to GPU only while it runs. Needs accelerate,
+            # and the pipeline must NOT have been .to(device)'d first.
+            self.pipe.enable_model_cpu_offload()
+            logging.info("✅ FLUX pipeline loaded (model CPU offload)")
+        else:
+            self.pipe.to(self.device)
+            logging.info("✅ FLUX pipeline loaded (fully resident)")
         # Modest VRAM relief so FLUX can coexist with TRELLIS.2 on the box.
         self.pipe.enable_attention_slicing()
-        logging.info("✅ FLUX pipeline loaded")
 
     def generate(
         self,
