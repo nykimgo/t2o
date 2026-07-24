@@ -283,7 +283,7 @@ class Trellis2InferenceCore(TrellisInferenceCore):
                 "object_path": context.get("object_path") or context.get("file_identifier"),
                 "prompt_used": prompt,
                 "reference_image": str(ref_path),
-                "aug_prompt": context.get("aug_prompt"),
+                "t2i_prompt": context.get("t2i_prompt"),
                 "description_en": context.get("description_en"),
                 "seed": seed,
                 "backend": "trellis2",

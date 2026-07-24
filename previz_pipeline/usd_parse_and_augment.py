@@ -811,21 +811,21 @@ def parse_and_augment(
             print(f"[INFO] 1단계 모델 언로드 중...")
             _unload_ollama_model(translation_model, base_url)
     
-    # 5. 최종 JSON 생성 (필수 정보 + aug_prompt)
+    # 5. 최종 JSON 생성 (필수 정보 + t2i_prompt)
     final_results = []
-    aug_prompt_count = 0
+    t2i_prompt_count = 0
     translated_count = 0
     description_only_count = 0
     
     for essential in essential_objects:
         target = essential.get("target", "")
         
-        # aug_prompt 가져오기 (여러 키 시도)
-        aug_prompt = ""
+        # t2i_prompt 가져오기 (여러 키 시도)
+        t2i_prompt = ""
         if target == "object":
             path_key = essential.get("object_path", "")
             # 여러 키로 시도
-            aug_prompt = (
+            t2i_prompt = (
                 augmented_dict.get(path_key, "") or
                 augmented_dict.get(essential.get("object_name", ""), "") or
                 augmented_dict.get(essential.get("object_id", ""), "") or
@@ -833,7 +833,7 @@ def parse_and_augment(
             )
         elif ENABLE_ACTOR_PARSING and target == "actor":
             path_key = essential.get("actor_path", "")
-            aug_prompt = (
+            t2i_prompt = (
                 augmented_dict.get(path_key, "") or
                 augmented_dict.get(essential.get("actor_name", ""), "") or
                 augmented_dict.get(essential.get("actor_id", ""), "") or
@@ -841,18 +841,18 @@ def parse_and_augment(
             )
         else:
             path_key = essential.get("object_path") or essential.get("actor_path", "")
-            aug_prompt = augmented_dict.get(path_key, "")
+            t2i_prompt = augmented_dict.get(path_key, "")
         
-        # 프롬프트 우선순위: aug_prompt -> translated_description -> description
-        # aug_prompt가 비어있으면 translated_description 사용
-        if not aug_prompt:
-            aug_prompt = essential.get("translated_description", "")
-            if aug_prompt:
+        # 프롬프트 우선순위: t2i_prompt -> translated_description -> description
+        # t2i_prompt가 비어있으면 translated_description 사용
+        if not t2i_prompt:
+            t2i_prompt = essential.get("translated_description", "")
+            if t2i_prompt:
                 translated_count += 1
             else:
                 description_only_count += 1
         else:
-            aug_prompt_count += 1
+            t2i_prompt_count += 1
         
         # 최종 결과 구성
         final_item = {
@@ -883,7 +883,7 @@ def parse_and_augment(
         final_item["category"] = essential.get("category", "")
         _copy_bilingual_fields(essential, final_item, "description")
         final_item["translated_description"] = essential.get("translated_description", "")
-        final_item["aug_prompt"] = aug_prompt
+        final_item["t2i_prompt"] = t2i_prompt
         
         final_results.append(final_item)
     
@@ -912,7 +912,7 @@ def parse_and_augment(
         final_results.append(meta_item)
     
     # 통계 정보 계산
-    augmented_success_count = aug_prompt_count
+    augmented_success_count = t2i_prompt_count
     
     # 타입별 통계
     parsed_objects_count = len(objects)
@@ -929,7 +929,7 @@ def parse_and_augment(
         "scene_canonical_count": len(scene_objects),
         "shot_meta_only_count": len(shot_objects),
         "with_description": with_description_count,
-        "aug_prompt_count": aug_prompt_count,
+        "t2i_prompt_count": t2i_prompt_count,
         "translated_count": translated_count,
         "description_only_count": description_only_count,
         "skipped_shot_override_paths": [
@@ -950,7 +950,7 @@ def parse_and_augment(
     print(f"[INFO] 통계:")
     print(f"  - USD 파싱: 총 {len(parsed_objects)}개 (object: {parsed_objects_count}개, actor: {parsed_actors_count}개)")
     print(f"  - description 있음: {with_description_count}개")
-    print(f"  - aug_prompt 사용: {aug_prompt_count}개")
+    print(f"  - t2i_prompt 사용: {t2i_prompt_count}개")
     print(f"  - translated_description 사용: {translated_count}개")
     print(f"  - description만 사용: {description_only_count}개")
     print(f"  - shot override(meta-only, TRELLIS/merge 제외): {len(shot_objects)}개")

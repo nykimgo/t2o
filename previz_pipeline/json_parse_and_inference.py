@@ -130,7 +130,7 @@ def _build_default_config(seed: Any, formats: List[str],
 
 def load_augmented_records(
     json_path: Path,
-    prefer_aug_prompt: bool,
+    prefer_t2i_prompt: bool,
     allow_original_fallback: bool,
     target_filter: Optional[str],
     max_items: Optional[int],
@@ -164,10 +164,10 @@ def load_augmented_records(
             skipped["shot_override_meta_only"].append(item_path)
             continue
 
-        # 프롬프트 우선순위: aug_prompt -> translated_description -> description_en -> description(en)
+        # 프롬프트 우선순위: t2i_prompt -> translated_description -> description_en -> description(en)
         prompt_text: Optional[str] = None
-        if prefer_aug_prompt:
-            prompt_text = item.get('aug_prompt')
+        if prefer_t2i_prompt:
+            prompt_text = item.get('t2i_prompt')
         if not prompt_text:
             prompt_text = item.get('translated_description')
         if not prompt_text:
@@ -215,7 +215,7 @@ def load_augmented_records(
             'target_type': target_type,
             'category': category,
             'translated_name': translated_name,
-            'aug_prompt': item.get('aug_prompt'),
+            't2i_prompt': item.get('t2i_prompt'),
             'description_en': item.get('description_en'),
             'translated_description': item.get('translated_description'),
             'run_id': run_id,
@@ -245,8 +245,8 @@ def parse_args():
     parser.add_argument('--usd_root', help='USD 프로젝트 루트 (usd_file_path 미지정 시 scene canonical 경로 유도용)')
     parser.add_argument('--target', choices=['object', 'actor', 'all'], default='object', help='JSON에서 추출할 타겟 유형 (기본: object)')
     parser.add_argument('--max_items', type=int, help='처리할 최대 항목 수')
-    parser.add_argument('--prefer_original', action='store_true', help='aug_prompt보다 원본 prompt를 우선 사용')
-    parser.add_argument('--allow_original_fallback', action='store_true', help='aug_prompt가 없을 때 원본 prompt 사용 허용')
+    parser.add_argument('--prefer_original', action='store_true', help='t2i_prompt보다 원본 prompt를 우선 사용')
+    parser.add_argument('--allow_original_fallback', action='store_true', help='t2i_prompt가 없을 때 원본 prompt 사용 허용')
     parser.add_argument('--seed', default='random', help='기본 시드값 (random 또는 정수)')
     parser.add_argument('--seed_from_json', action='store_true', help='JSON 내 seed가 있으면 사용')
     parser.add_argument('--llm_label', default='usd_aug', help='출력 구조에 표시할 LLM 라벨')
@@ -310,7 +310,7 @@ def main():
     try:
         records = load_augmented_records(
             json_path=json_path,
-            prefer_aug_prompt=not args.prefer_original,
+            prefer_t2i_prompt=not args.prefer_original,
             allow_original_fallback=True if args.allow_original_fallback or args.prefer_original else False,
             target_filter=target_filter,
             max_items=args.max_items,

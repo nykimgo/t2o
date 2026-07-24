@@ -83,7 +83,7 @@ cd /root/previs_proj
       * `usd_results.json` — 이번 run 입력 스냅샷
       * `results.csv` — TRELLIS 생성 결과 (prompt, seed, run_id)
       * `previews/scene_n/object_n/` — ply/mp4/jpg + `generation.json` (프롬프트 추적)
-      * 각 항목에는 `object_path`, `usd_file_path`, `description`(`{ko,en}`), `description_ko`, `description_en`, `translated_description`, `aug_prompt` 등이 포함됩니다.
+      * 각 항목에는 `object_path`, `usd_file_path`, `description`(`{ko,en}`), `description_ko`, `description_en`, `translated_description`, `t2i_prompt` 등이 포함됩니다.
 
 **USD object customData (bilingual 스키마)**
 
@@ -101,7 +101,7 @@ cd /root/previs_proj
 |------|------|-----|
 | 기본 | USD `en` → `description_en` / `translated_description` | 없음 |
 | `--translate` | USD `ko` → LLM 번역 → `translated_description` | 1단계 |
-| `--filter` | 영어 프롬프트 증강 → `aug_prompt` | 2단계 |
+| `--filter` | 영어 프롬프트 증강 → `t2i_prompt` | 2단계 |
 
 **2. Stage 2: Asset Factory (TRELLIS)**
 
