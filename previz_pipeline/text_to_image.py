@@ -41,11 +41,12 @@ _OFFLOAD_VRAM_THRESHOLD_GB = float(os.environ.get("T2I_OFFLOAD_THRESHOLD_GB", "4
 _LOCAL_DEFAULT = str(
     Path(__file__).resolve().parents[1] / "hf_models" / "FLUX.1-schnell")
 
-# Prompt scaffolding tuned for single-object, image-to-3D friendly renders.
-_POSITIVE_SUFFIX = (
-    "single object, centered, full object in frame, plain white background, "
-    "studio product shot, soft even lighting, high detail, photorealistic"
-)
+# Prompt scaffolding.
+# NOTE: 본 파이프라인은 이제 §9 확정 시스템 프롬프트(t2i_prompt_builder)가 격리문구/자세
+# 스캐폴딩을 프롬프트에 직접 포함한다. 여기서 다시 suffix 를 붙이면 배경 지시가 충돌한다
+# (§9=neutral background vs 구 suffix=plain white/studio product shot — ablation 패배값).
+# 그래서 기본값을 비운다. 독립 실행/실험 시엔 T2I_POSITIVE_SUFFIX 로 주입 가능.
+_POSITIVE_SUFFIX = os.environ.get("T2I_POSITIVE_SUFFIX", "")
 
 
 class TextToImage:
@@ -132,7 +133,7 @@ class TextToImage:
         if self.pipe is None:
             self.load()
 
-        full_prompt = f"{prompt.strip()}. {_POSITIVE_SUFFIX}"
+        full_prompt = f"{prompt.strip()}. {_POSITIVE_SUFFIX}" if _POSITIVE_SUFFIX else prompt.strip()
         generator = torch.Generator(device=self.device).manual_seed(int(seed))
         logging.info(f"🎨 T2I generate (seed={seed}, steps={steps}): {prompt[:60]}")
         image = self.pipe(

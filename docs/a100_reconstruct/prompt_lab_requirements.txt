@@ -1,0 +1,14 @@
+# 필수 — 결정론적 CV 탐지기가 쓰는 전부. 학습 모델 의존 없음.
+PyYAML>=6.0
+numpy>=1.24
+Pillow>=9.0
+pytest>=7.0
+
+# 선택 — 있으면 연결요소/형태학이 빨라진다. 없으면 순수 numpy 로 폴백한다.
+# opencv-python-headless>=4.8
+
+# 실제 이미지 모델을 붙일 때만 (스텁 A 를 채운 뒤)
+# torch
+# diffusers>=0.30
+# transformers
+# accelerate

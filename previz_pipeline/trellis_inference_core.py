@@ -456,6 +456,21 @@ class TrellisInferenceCore:
         # Save results to CSV
         self._save_results_to_csv()
 
+        # 단계별 소요 시간 요약 (T2I / I2O 는 trellis2 백엔드에서만 분리 계측됨)
+        _ok = [r for r in self.results_data if r.get('success')]
+        if _ok:
+            _sum = lambda k: sum(float(r.get(k) or 0.0) for r in _ok)
+            logging.info("⏱️  ===== 2단계(생성) 소요 시간 =====")
+            if any('t2i_time' in r for r in _ok):
+                logging.info(f"⏱️    T2I 합계: {_sum('t2i_time'):.1f}s")
+                logging.info(f"⏱️    I2O 합계: {_sum('i2o_time'):.1f}s")
+            else:
+                logging.info(f"⏱️    생성(T2I+I2O) 합계: {_sum('generation_time'):.1f}s")
+            logging.info(f"⏱️    프리뷰 렌더 합계: {_sum('render_time'):.1f}s")
+            logging.info(f"⏱️    저장(GLB/mp4/jpg) 합계: {_sum('save_time'):.1f}s")
+            logging.info(f"⏱️    객체 {len(_ok)}개 합계: {_sum('total_time'):.1f}s "
+                         f"(객체당 평균 {_sum('total_time') / len(_ok):.1f}s)")
+
     def _get_unique_filename(self, directory: Path, base_filename: str) -> str:
         """
         중복되는 파일명이 있으면 파일명 뒤에 001, 002, ... 형태로 숫자를 붙여서 유니크한 파일명 반환

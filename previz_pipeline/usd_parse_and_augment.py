@@ -12,6 +12,7 @@ import time
 from typing import List, Optional, Dict, Any, Tuple
 
 from bilingual import is_blank, pick_lang
+from t2i_prompt_builder import build_t2i_prompt
 
 # USD 파서 import
 try:
@@ -525,6 +526,13 @@ def augment_batch_with_ollama(
         english_name = _get_english_name(obj)
         if english_name and obj.get("target") == "object":
             llm_obj["name"] = english_name
+        # appearance 는 색/재질 등 base_description 에 없는 외형 디테일을 담고 있다.
+        # 필터에 같이 넣어 하나의 정제 캡션으로 합치게 한다 — 예전엔 필터를 우회해
+        # 프롬프트 뒤에 raw 로 붙었고, 그래서 "held in hand" 같은 맥락이 살아남았다.
+        _appearance_en = str(obj.get("appearance_en")
+                             or pick_lang(obj.get("appearance"), "en") or "").strip()
+        if _appearance_en:
+            llm_obj["appearance"] = _appearance_en
         objects_for_llm.append(llm_obj)
     
     input_json = json.dumps(objects_for_llm, ensure_ascii=False, indent=2)
@@ -550,9 +558,21 @@ def augment_batch_with_ollama(
         print(f"[DEBUG][필터링] JSON 파싱 성공: {len(result)}개 항목")
         print(f"[DEBUG][필터링] LLM 응답 키들: {list(result.keys())[:5]}...")
     except Exception as e:
+        # 여기서 {} 를 반환하면 호출부가 조용히 raw description 폴백으로 넘어간다.
+        # 로그 통계만 보면 "필터 OFF 로 돌린 런"과 구분이 안 되므로 크게 경고한다.
+        # (gpt-oss:20b 가 간헐적으로 깨진 JSON 을 뱉는다 — 재실행하면 대개 통과.)
         print(f"[ERROR][필터링] JSON 파싱 실패: {e}")
         import traceback
         traceback.print_exc()
+        print("")
+        print("=" * 72)
+        print("⚠️  [필터링 실패] 2단계 필터가 적용되지 않았습니다 "
+              f"— 대상 {len(objects_with_description)}개 전부 원본 description 폴백")
+        print("⚠️  결과 프롬프트는 정제되지 않은 상태입니다(장면 맥락/복수형/맥락어 잔존).")
+        print("⚠️  --filter 를 켜고 돌렸다면 이 런의 산출물은 filter OFF 와 사실상 동일합니다.")
+        print("⚠️  LLM 이 유효한 JSON 을 내지 못한 간헐적 실패일 수 있으니 재실행을 권장합니다.")
+        print("=" * 72)
+        print("")
         return {}
     
     path_to_obj = _build_path_to_obj_map(objects_with_description)
@@ -622,8 +642,12 @@ def extract_essential_info(parsed_objects: List[Dict[str, str]]) -> List[Dict[st
             essential["object_id"] = obj.get("object_id", "")
             essential["object_scope"] = obj.get("object_scope", "scene")
             essential["category"] = obj.get("category", "")
+            essential["rig_type"] = obj.get("rig_type", "")
             _copy_bilingual_fields(obj, essential, "name")
             _copy_bilingual_fields(obj, essential, "description")
+            # §9 무생물 템플릿의 {appearance} 슬롯 입력. 없으면 build_t2i_prompt 가
+            # 빈 문자열을 받아 슬롯이 통째로 빠진다.
+            _copy_bilingual_fields(obj, essential, "appearance")
         elif ENABLE_ACTOR_PARSING and target == "actor":
             # [OBJECT-ONLY DISABLED] actor의 경우
             essential["target"] = "actor"
@@ -643,8 +667,10 @@ def extract_essential_info(parsed_objects: List[Dict[str, str]]) -> List[Dict[st
                 essential["object_name"] = obj.get("object_name", "")
                 essential["object_id"] = obj.get("object_id", "")
                 essential["category"] = obj.get("category", "")
+                essential["rig_type"] = obj.get("rig_type", "")
                 _copy_bilingual_fields(obj, essential, "name")
                 _copy_bilingual_fields(obj, essential, "description")
+                _copy_bilingual_fields(obj, essential, "appearance")
                 essential["prompt"] = _get_english_description(obj)
             elif ENABLE_ACTOR_PARSING and ("actor_path" in obj or "actor_name" in obj):
                 # [OBJECT-ONLY DISABLED] actor fallback
@@ -711,9 +737,16 @@ def parse_and_augment(
         print(f"   현재 작업 디렉토리: {os.getcwd()}")
         raise FileNotFoundError(f"USD 파일을 찾을 수 없습니다: {usd_file_path}")
     
+    # 단계별 소요 시간 계측 (로그 말미에 요약 출력)
+    _stage_times: Dict[str, float] = {}
+    _t_pipeline_start = time.time()
+
     # 1. USD 파일 파싱
+    _t0 = time.time()
     parsed_objects = parse_usd_file(usd_file_path, parse_type=parse_type)
+    _stage_times["USD 파싱"] = time.time() - _t0
     print(f"[INFO] 추출된 항목 수: {len(parsed_objects)}")
+    print(f"[TIME] USD 파싱: {_stage_times['USD 파싱']:.1f}s")
     
     # 타입별 개수 확인
     objects = [r for r in parsed_objects if "object_name" in r]
@@ -751,13 +784,16 @@ def parse_and_augment(
     if enable_translate:
         translation_model = model_name
         print(f"[INFO] 1단계 번역 시작 (모델: {translation_model})...")
+        _t0 = time.time()
         translation_result = translate_descriptions_with_ollama(
             essential_objects,
             model_name=translation_model,
             base_url=base_url,
             prompt_file=translation_prompt_file
         )
+        _stage_times["1단계 번역(LLM)"] = time.time() - _t0
         print(f"[INFO] 1단계 번역 완료: {len(translation_result)}개")
+        print(f"[TIME] 1단계 번역(LLM): {_stage_times['1단계 번역(LLM)']:.1f}s")
         
         missing_translation = 0
         for obj in essential_objects:
@@ -791,13 +827,19 @@ def parse_and_augment(
     # 4. LLM 필터링 (옵션)
     if enable_filter:
         print(f"[INFO] 2단계 필터링 시작 (모델: {filter_model})...")
+        _t0 = time.time()
         augmented_dict = augment_batch_with_ollama(
             essential_objects,
             model_name=filter_model,
             system_prompt_file=filter_prompt_file,
             base_url=base_url
         )
+        _stage_times["프롬프트 최적화(2단계 필터, LLM)"] = time.time() - _t0
         print(f"[INFO] LLM 증강 완료: {len(augmented_dict)}개")
+        if not augmented_dict:
+            print("[ERROR] 2단계 필터가 결과를 하나도 내지 못했습니다 — 원본 description 으로 폴백합니다.")
+        print(f"[TIME] 프롬프트 최적화(2단계 필터): "
+              f"{_stage_times['프롬프트 최적화(2단계 필터, LLM)']:.1f}s")
         
         # 2단계 모델 언로드
         print(f"[INFO] 2단계 모델 언로드 중...")
@@ -843,6 +885,9 @@ def parse_and_augment(
             path_key = essential.get("object_path") or essential.get("actor_path", "")
             t2i_prompt = augmented_dict.get(path_key, "")
         
+        # 이 항목의 t2i_prompt 가 2단계 필터 캡션에서 나왔는지 (아래 {appearance} 슬롯 결정에 사용)
+        _from_filter = bool(t2i_prompt)
+
         # 프롬프트 우선순위: t2i_prompt -> translated_description -> description
         # t2i_prompt가 비어있으면 translated_description 사용
         if not t2i_prompt:
@@ -883,8 +928,31 @@ def parse_and_augment(
         final_item["category"] = essential.get("category", "")
         _copy_bilingual_fields(essential, final_item, "description")
         final_item["translated_description"] = essential.get("translated_description", "")
-        final_item["t2i_prompt"] = t2i_prompt
-        
+
+        # §9 확정 시스템 프롬프트 적용 (category 라우팅: 무생물/생명체). prompt_lab
+        # EXPERIMENT_LOG.md §9. 필터 캡션/번역(t2i_prompt)을 base_description 슬롯으로,
+        # name(en)을 object 로 조립. 생명체는 body-plan 스캐폴딩(object만), 무생물은 격리문구 부착.
+        _obj_en = (_get_english_name(essential) if target == "object"
+                   else str(essential.get("actor_name", "")).strip())
+        _base_desc = t2i_prompt or _get_english_description(essential)
+        # 필터 캡션은 base_description 과 appearance 를 함께 보고 정제된 결과이므로
+        # raw appearance 를 다시 붙이지 않는다. 붙이면 필터가 제거한 맥락
+        # (예: "held in hand")이 되살아나 격리 구도가 깨진다 — berlin/object_1 회귀.
+        # 필터 OFF 면 정제 캡션이 없으니 raw appearance 를 그대로 슬롯에 채운다.
+        if _from_filter:
+            _appearance = ""
+        else:
+            _appearance = str(essential.get("appearance_en")
+                              or pick_lang(essential.get("appearance"), "en") or "").strip()
+        _final_prompt, _body_plan = build_t2i_prompt(
+            _obj_en, _appearance, _base_desc, essential.get("category", ""), target,
+            rig_type=essential.get("rig_type", ""))
+        final_item["t2i_prompt"] = _final_prompt
+        if _body_plan:
+            final_item["body_plan"] = _body_plan
+        if essential.get("rig_type"):
+            final_item["rig_type"] = essential.get("rig_type", "")
+
         final_results.append(final_item)
     
     # 5-1. Shot override는 메타 참고용으로만 JSON에 보존 (생성/주입 제외, 스펙 6절)
@@ -955,6 +1023,30 @@ def parse_and_augment(
     print(f"  - description만 사용: {description_only_count}개")
     print(f"  - shot override(meta-only, TRELLIS/merge 제외): {len(shot_objects)}개")
     print(f"[INFO] 총 {len(final_results)}개 항목 저장됨")
+
+    # 필터를 켜고 돌렸는데 캡션이 하나도 안 붙은 경우 = 사실상 filter OFF 산출물.
+    # 로그 끝에서 한 번 더 크게 알린다(중간 ERROR 는 긴 로그에 묻힌다).
+    if enable_filter and t2i_prompt_count == 0 and with_description_count > 0:
+        print("")
+        print("=" * 72)
+        print(f"⚠️  [경고] --filter 로 실행했지만 필터 캡션이 적용된 항목이 0개입니다 "
+              f"(대상 {with_description_count}개).")
+        print("⚠️  이 런의 프롬프트는 filter OFF 와 동일합니다. 위 [ERROR][필터링] 로그를 확인하고")
+        print("⚠️  재실행하세요 — LLM JSON 파싱 실패는 간헐적이라 재시도로 대개 해결됩니다.")
+        print("=" * 72)
+    elif enable_filter and t2i_prompt_count < with_description_count:
+        print(f"⚠️  [경고] 필터 캡션 미적용 항목 "
+              f"{with_description_count - t2i_prompt_count}개 "
+              f"(적용 {t2i_prompt_count}/{with_description_count}) — 해당 항목은 원본 description 사용")
+
+    # 단계별 소요 시간 요약 (1단계 = USD 파싱 + LLM 번역/필터)
+    _total = time.time() - _t_pipeline_start
+    print(f"[TIME] ===== 1단계(stage1) 소요 시간 =====")
+    for _name, _sec in _stage_times.items():
+        print(f"[TIME]   {_name}: {_sec:.1f}s ({_sec / _total * 100:.0f}%)")
+    _other = _total - sum(_stage_times.values())
+    print(f"[TIME]   기타(추출/조립/저장): {_other:.1f}s ({_other / _total * 100:.0f}%)")
+    print(f"[TIME]   1단계 합계: {_total:.1f}s")
 
 
 # 사용 예시

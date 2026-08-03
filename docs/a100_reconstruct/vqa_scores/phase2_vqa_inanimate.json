@@ -1,0 +1,350 @@
+{
+  "thr": 0.85,
+  "cells": [
+    {
+      "cell_id": "obj+app+base|reversed|iso_on|lab_default|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "lab_default",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8842,
+      "acceptance": 0.8438,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app+base|as_listed|iso_on|lab_default|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "lab_default",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.869,
+      "acceptance": 0.6875,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj|as_listed|iso_on|white_studio|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "white_studio",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8573,
+      "acceptance": 0.5625,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj|reversed|iso_on|white_studio|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "white_studio",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8573,
+      "acceptance": 0.5625,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj|as_listed|iso_on|neutral|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8521,
+      "acceptance": 0.6562,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj|reversed|iso_on|neutral|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8521,
+      "acceptance": 0.6562,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app+base|as_listed|iso_on|neutral|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8509,
+      "acceptance": 0.625,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj|as_listed|iso_on|matte_product|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "matte_product",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8462,
+      "acceptance": 0.5938,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj|reversed|iso_on|matte_product|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "matte_product",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8462,
+      "acceptance": 0.5938,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app|reversed|iso_on|lab_default|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "lab_default",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.844,
+      "acceptance": 0.6562,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app|as_listed|iso_on|lab_default|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "lab_default",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8416,
+      "acceptance": 0.6562,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app+base|reversed|iso_on|neutral|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.84,
+      "acceptance": 0.625,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj|as_listed|iso_on|lab_default|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "lab_default",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8389,
+      "acceptance": 0.5938,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj|reversed|iso_on|lab_default|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "lab_default",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8389,
+      "acceptance": 0.5938,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app|as_listed|iso_on|neutral|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8332,
+      "acceptance": 0.5312,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app+base|reversed|iso_on|matte_product|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "matte_product",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8292,
+      "acceptance": 0.4375,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app+base|reversed|iso_on|white_studio|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "white_studio",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8272,
+      "acceptance": 0.375,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app+base|as_listed|iso_on|matte_product|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "matte_product",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8245,
+      "acceptance": 0.5,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app+base|as_listed|iso_on|white_studio|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "white_studio",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8183,
+      "acceptance": 0.4062,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app|as_listed|iso_on|matte_product|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "matte_product",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.801,
+      "acceptance": 0.4375,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app|as_listed|iso_on|white_studio|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "white_studio",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.8,
+      "acceptance": 0.3438,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app|reversed|iso_on|neutral|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.7901,
+      "acceptance": 0.375,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app|reversed|iso_on|white_studio|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "white_studio",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.7798,
+      "acceptance": 0.3438,
+      "n_records": 8
+    },
+    {
+      "cell_id": "obj+app|reversed|iso_on|matte_product|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "matte_product",
+        "model": "flux_schnell"
+      },
+      "mean_vqa": 0.7795,
+      "acceptance": 0.375,
+      "n_records": 8
+    }
+  ],
+  "effects": [
+    [
+      "isolation_text",
+      0.0317,
+      {
+        "lab_default": 0.8528,
+        "white_studio": 0.8233,
+        "neutral": 0.8364,
+        "matte_product": 0.8211
+      }
+    ],
+    [
+      "fields",
+      0.04,
+      {
+        "obj+app+base": 0.8429,
+        "obj": 0.8486,
+        "obj+app": 0.8086
+      }
+    ],
+    [
+      "order",
+      0.0054,
+      {
+        "reversed": 0.8307,
+        "as_listed": 0.8361
+      }
+    ]
+  ],
+  "loo_mean_vqa": 0.8842,
+  "loo_winners": {
+    "obj+app+base|reversed|iso_on|lab_default|flux_schnell": 8
+  }
+}

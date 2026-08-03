@@ -1,0 +1,4 @@
+- [TRELLIS.2 환경 버전 핀](trellis2-env-pins.md) — conda `trellis2` 는 opencv 4.x / transformers 4.56.2 핀; FLUX(t2i)도 이 env 로 통합됨(별도 t2i env 불필요)
+- [t2o_pipeline 서버 배치](t2o-pipeline-server-layout.md) — 이 서버는 env 재구축 불필요. NEW_SERVER_SETUP.md 와 어긋나는 지점 정리
+- [GLB→USD 네이티브 변환기](glb-to-usd-native-converter.md) — usd_from_gltf 레거시 바이너리를 trimesh+pxr 순수 파이썬으로 교체 (의존성 0 추가)
+- [prompt_lab 실험](prompt-lab-experiments.md) — 프롬프트 최적화 실험 로깅 관례(EXPERIMENT_LOG.md)·objective 설계(CV게이트+VQAScore)·실행 env(trellis2/prompt_metrics)

@@ -424,3 +424,11 @@ trellis2_src/
 !README.md
 !TRELLIS2_MIGRATION.md
 !NEW_SERVER_SETUP.md
+# docs/ 와 edit3d/ 아래 문서 전부 (전역 *.md 규칙에 걸려 있었다)
+!docs/**/*.md
+!edit3d/**/*.md
+
+# 종료된 실험 — 시스템 프롬프트 v1 확정(2026-08). 4090 서버 사본이 정본.
+# 상세: docs/SERVER_4090_SETUP.md §4
+prompt_lab/
+prompt_lab.sh

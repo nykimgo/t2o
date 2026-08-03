@@ -130,6 +130,54 @@ def _derive_next_base(prim_path_str: str, base_path: Optional[List[str]], child_
 # description 후보에서 제외할 USD 스키마 노이즈 필드 (예: pxr가 자동 생성하는 문서 주석)
 _DESCRIPTION_NOISE_FIELDS = ("userDocBrief",)
 
+# 업스트림(의도분석) 리깅 분류 필드. object customData 최상위에
+# `string rig_type` = biped|quadruped|bird|insect|static object 로 들어온다.
+# (정본 = 의도분석 모듈 실제 산출 형태, 2026-07-28 확정. 구 `etc.rig_type` 중첩 dict 형태도 계속 읽는다.)
+_VALID_RIG_TYPES = {"biped", "quadruped", "bird", "insect", "static_object"}
+
+
+def _normalize_rig_type(value) -> str:
+    """rig_type 값 정규화: 'static object'/'Static-Object' → 'static_object'. 미지값은 ''."""
+    if not value:
+        return ""
+    v = "_".join(str(value).strip().lower().replace("-", "_").replace(" ", "_").split("_"))
+    if v in {"static", "staticobject", "inanimate", "prop", "object"}:
+        v = "static_object"
+    return v if v in _VALID_RIG_TYPES else ""
+
+
+def _resolve_rig_type(custom_data: Dict, prim=None) -> str:
+    """object 의 rig_type 을 여러 인코딩에서 견고하게 찾는다.
+    ① customData 최상위 `rig_type` (정본 — 의도분석 모듈 산출 형태)
+    ② customData 중첩 dict `etc.rig_type` (구 형태, 하위호환)
+    ③ (pxr) 자식 prim `etc` 의 customData/attribute `rig_type`."""
+    if isinstance(custom_data, dict):
+        rt = _normalize_rig_type(custom_data.get("rig_type"))
+        if rt:
+            return rt
+        etc = custom_data.get("etc")
+        if isinstance(etc, dict):
+            rt = _normalize_rig_type(etc.get("rig_type"))
+            if rt:
+                return rt
+    if prim is not None:
+        try:
+            for child in prim.GetChildren():
+                if child.GetName() != "etc":
+                    continue
+                cd = child.GetCustomData() or {}
+                rt = _normalize_rig_type(cd.get("rig_type"))
+                if rt:
+                    return rt
+                attr = child.GetAttribute("rig_type")
+                if attr and attr.IsValid():
+                    rt = _normalize_rig_type(attr.Get())
+                    if rt:
+                        return rt
+        except Exception:
+            pass
+    return ""
+
 
 def _resolve_description(custom_data: Dict) -> Dict[str, str]:
     """
@@ -335,10 +383,11 @@ def parse_usd_file_with_api(
     # [OBJECT-ONLY] 액터 USD인지 판별 (actors 디렉토리 하위 파일로 추정)
     is_actor_file = ENABLE_ACTOR_PARSING and file_parent == "actors"
     
-    def _build_object_result(custom_data: Dict[str, str], usd_file_path: str = None) -> Optional[Dict[str, str]]:
+    def _build_object_result(custom_data: Dict[str, str], usd_file_path: str = None, prim=None) -> Optional[Dict[str, str]]:
         category = custom_data.get("category", "")
         object_id = custom_data.get("object_id", "")
         image_path = custom_data.get("image_path", "")
+        rig_type = _resolve_rig_type(custom_data, prim)
 
         if base_path and len(base_path) > 0 and base_path[-1] == file_stem:
             object_path = "/".join(base_path)
@@ -360,13 +409,15 @@ def parse_usd_file_with_api(
         _attach_bilingual_object_fields(result, custom_data)
         if category:
             result["category"] = category
+        if rig_type:
+            result["rig_type"] = rig_type
         if image_path:
             result["image_path"] = image_path
         if usd_file_path:
             result["usd_file_path"] = os.path.normpath(usd_file_path)
 
         return result
-    
+
     # [OBJECT-ONLY DISABLED] actor 결과 빌더 — ENABLE_ACTOR_PARSING=True 시 사용
     def _build_actor_result(custom_data: Dict[str, str], usd_file_path: str = None) -> Optional[Dict[str, str]]:
         actor_id = custom_data.get("ID", "") or custom_data.get("object_id", "")
@@ -433,7 +484,7 @@ def parse_usd_file_with_api(
             custom_data = prim.GetCustomData()
             if not custom_data:
                 continue
-            result = _build_object_result(custom_data, usd_file_path)
+            result = _build_object_result(custom_data, usd_file_path, prim)
             if result:
                 results.append(result)
                 captured = True
@@ -810,6 +861,8 @@ def parse_usd_file_regex(
         category = _extract_field(custom_block, "category")
         object_id = _extract_field(custom_block, "object_id") or os.path.splitext(os.path.basename(file_path_abs))[0]
         image_path = _extract_field(custom_block, "image_path")
+        # rig_type: etc 중첩이든 최상위든 custom_block(중괄호 균형 추출)에 포함되므로 직접 매칭
+        rig_type = _normalize_rig_type(_extract_field(custom_block, "rig_type"))
         
         # base_components에 이미 object 이름이 포함되어 있을 수 있음 (예: ["scene_1", "shot_1", "object_1"])
         file_stem = os.path.splitext(os.path.basename(file_path_abs))[0]
@@ -838,6 +891,8 @@ def parse_usd_file_regex(
         _attach_bilingual_object_fields(result, custom_data)
         if category:
             result["category"] = category
+        if rig_type:
+            result["rig_type"] = rig_type
         if image_path:
             result["image_path"] = image_path
         if relative_path:

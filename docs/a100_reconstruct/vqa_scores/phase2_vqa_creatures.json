@@ -1,0 +1,345 @@
+{
+  "cells": [
+    {
+      "cell_id": "obj|as_listed|iso_on|neutral_t|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8525,
+      "tpose": 0.6401,
+      "comb": 0.7463,
+      "acc": 0.125
+    },
+    {
+      "cell_id": "obj|reversed|iso_on|neutral_t|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8525,
+      "tpose": 0.6401,
+      "comb": 0.7463,
+      "acc": 0.125
+    },
+    {
+      "cell_id": "obj|as_listed|iso_on|simple_t|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "simple_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8473,
+      "tpose": 0.6247,
+      "comb": 0.736,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj|reversed|iso_on|simple_t|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "simple_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8473,
+      "tpose": 0.6247,
+      "comb": 0.736,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj+app|as_listed|iso_on|neutral_t|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8846,
+      "tpose": 0.5808,
+      "comb": 0.7327,
+      "acc": 0.062
+    },
+    {
+      "cell_id": "obj+app|as_listed|iso_on|apose|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "apose",
+        "model": "flux_schnell"
+      },
+      "full": 0.8877,
+      "tpose": 0.5712,
+      "comb": 0.7295,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj+app|reversed|iso_on|neutral_t|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8747,
+      "tpose": 0.5816,
+      "comb": 0.7281,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj+app+base|as_listed|iso_on|neutral_t|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8689,
+      "tpose": 0.5754,
+      "comb": 0.7221,
+      "acc": 0.062
+    },
+    {
+      "cell_id": "obj+app|as_listed|iso_on|simple_t|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "simple_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8748,
+      "tpose": 0.5644,
+      "comb": 0.7196,
+      "acc": 0.062
+    },
+    {
+      "cell_id": "obj+app|reversed|iso_on|apose|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "apose",
+        "model": "flux_schnell"
+      },
+      "full": 0.8672,
+      "tpose": 0.5636,
+      "comb": 0.7154,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj+app|reversed|iso_on|simple_t|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "simple_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8633,
+      "tpose": 0.5639,
+      "comb": 0.7136,
+      "acc": 0.062
+    },
+    {
+      "cell_id": "obj|as_listed|iso_on|apose|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "apose",
+        "model": "flux_schnell"
+      },
+      "full": 0.8137,
+      "tpose": 0.6102,
+      "comb": 0.712,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj|reversed|iso_on|apose|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "apose",
+        "model": "flux_schnell"
+      },
+      "full": 0.8137,
+      "tpose": 0.6102,
+      "comb": 0.712,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj+app+base|as_listed|iso_on|apose|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "apose",
+        "model": "flux_schnell"
+      },
+      "full": 0.8478,
+      "tpose": 0.5703,
+      "comb": 0.7091,
+      "acc": 0.094
+    },
+    {
+      "cell_id": "obj+app+base|reversed|iso_on|neutral_t|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "neutral_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8315,
+      "tpose": 0.5799,
+      "comb": 0.7057,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj+app+base|as_listed|iso_on|simple_t|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "simple_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8491,
+      "tpose": 0.551,
+      "comb": 0.7,
+      "acc": 0.0
+    },
+    {
+      "cell_id": "obj+app+base|reversed|iso_on|simple_t|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "simple_t",
+        "model": "flux_schnell"
+      },
+      "full": 0.8191,
+      "tpose": 0.5588,
+      "comb": 0.689,
+      "acc": 0.0
+    },
+    {
+      "cell_id": "obj+app|as_listed|iso_on|refsheet|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "refsheet",
+        "model": "flux_schnell"
+      },
+      "full": 0.7644,
+      "tpose": 0.5899,
+      "comb": 0.6772,
+      "acc": 0.0
+    },
+    {
+      "cell_id": "obj+app+base|reversed|iso_on|apose|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "apose",
+        "model": "flux_schnell"
+      },
+      "full": 0.7742,
+      "tpose": 0.5765,
+      "comb": 0.6754,
+      "acc": 0.031
+    },
+    {
+      "cell_id": "obj|as_listed|iso_on|refsheet|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "refsheet",
+        "model": "flux_schnell"
+      },
+      "full": 0.7132,
+      "tpose": 0.6179,
+      "comb": 0.6656,
+      "acc": 0.0
+    },
+    {
+      "cell_id": "obj|reversed|iso_on|refsheet|flux_schnell",
+      "levels": {
+        "fields": "obj",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "refsheet",
+        "model": "flux_schnell"
+      },
+      "full": 0.7132,
+      "tpose": 0.6179,
+      "comb": 0.6656,
+      "acc": 0.0
+    },
+    {
+      "cell_id": "obj+app|reversed|iso_on|refsheet|flux_schnell",
+      "levels": {
+        "fields": "obj+app",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "refsheet",
+        "model": "flux_schnell"
+      },
+      "full": 0.7274,
+      "tpose": 0.591,
+      "comb": 0.6592,
+      "acc": 0.0
+    },
+    {
+      "cell_id": "obj+app+base|as_listed|iso_on|refsheet|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "as_listed",
+        "isolation": "iso_on",
+        "isolation_text": "refsheet",
+        "model": "flux_schnell"
+      },
+      "full": 0.7111,
+      "tpose": 0.584,
+      "comb": 0.6476,
+      "acc": 0.0
+    },
+    {
+      "cell_id": "obj+app+base|reversed|iso_on|refsheet|flux_schnell",
+      "levels": {
+        "fields": "obj+app+base",
+        "order": "reversed",
+        "isolation": "iso_on",
+        "isolation_text": "refsheet",
+        "model": "flux_schnell"
+      },
+      "full": 0.6769,
+      "tpose": 0.5906,
+      "comb": 0.6337,
+      "acc": 0.0
+    }
+  ],
+  "loo_winners": {
+    "obj+app|as_listed|iso_on|neutral_t|flux_schnell": 1,
+    "obj|as_listed|iso_on|neutral_t|flux_schnell": 7
+  },
+  "loo_comb": 0.731
+}

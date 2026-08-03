@@ -223,8 +223,11 @@ class Trellis2InferenceCore(TrellisInferenceCore):
         gen_start = time.time()
         ref_path = preview_dir / f"{file_prefix}_ref.png"
         image = self._t2i_generate(prompt, seed, str(ref_path))
+        t2i_time = time.time() - gen_start
+        logging.info(f"⏱️  [T2I] {object_name}: {t2i_time:.1f}s")
 
         # --- Stage B: Image -> 3D (TRELLIS.2) ---
+        i2o_start = time.time()
         try:
             mesh = self.pipeline.run(
                 image,
@@ -239,6 +242,8 @@ class Trellis2InferenceCore(TrellisInferenceCore):
         except Exception as e:
             logging.error(f"❌ TRELLIS.2 run failed: {e}")
             raise
+        i2o_time = time.time() - i2o_start
+        logging.info(f"⏱️  [I2O] {object_name}: {i2o_time:.1f}s")
         generation_time = time.time() - gen_start
 
         # --- Stage C: PBR preview render (best-effort) ---
@@ -309,6 +314,10 @@ class Trellis2InferenceCore(TrellisInferenceCore):
 
         save_time = time.time() - save_start
         total_time = time.time() - start_time
+        logging.info(
+            f"⏱️  [객체 합계] {object_name}: {total_time:.1f}s "
+            f"(T2I {t2i_time:.1f}s / I2O {i2o_time:.1f}s / "
+            f"render {render_time:.1f}s / save {save_time:.1f}s)")
 
         preview_only = [Path(p).name for p in saved_files
                         if Path(p).parent.resolve() == preview_dir.resolve()]
@@ -328,6 +337,8 @@ class Trellis2InferenceCore(TrellisInferenceCore):
             "object_path": context.get("object_path") or context.get("file_identifier"),
             "reference_image": str(ref_path),
             "generation_time": round(generation_time, 2),
+            "t2i_time": round(t2i_time, 2),
+            "i2o_time": round(i2o_time, 2),
             "render_time": round(render_time, 2),
             "save_time": round(save_time, 2),
             "total_time": round(total_time, 2),
