@@ -2,7 +2,7 @@
 
 > 파이프라인: **text → image(FLUX.1-schnell) → 3D object(TRELLIS.2, image-to-3D) → GLB → USD 주입.**
 > 이 문서는 **이 A100 서버에서 2026-07-28 실제로 검증된 실행 절차와 함정**만 담는다.
-> 설계 배경은 같은 폴더의 `A100_HANDOFF.md`, `ENV_REBUILD_GUIDE.md`(env 핀 근거), `NEW_SERVER_SETUP.md`.
+> 설계 배경은 `SERVER_4090_SETUP.md`(서버 차이·확정 T2I 프롬프트), `../ENV_REBUILD_GUIDE.md`(env 핀 근거), `../NEW_SERVER_SETUP.md`.
 
 ---
 
@@ -27,7 +27,7 @@ cd /root/previs_proj
     ├── trellis2_src/           # TRELLIS.2 본체 (git 제외)
     ├── hf_models/              # TRELLIS.2-4B(16G), FLUX.1-schnell(54G) (git 제외)
     ├── prompt_lab/  prompt_lab.sh   # 프롬프트 최적화 실험 도구
-    └── docs/                   # A100_HANDOFF.md, RUN_GUIDE.md(이 문서), 등
+    └── docs/                   # RUN_GUIDE.md(이 문서), SERVER_4090_SETUP.md, 등
 ```
 
 ---

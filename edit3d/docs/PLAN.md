@@ -3,7 +3,7 @@
 > **작성**: 2026-08-04 (A100 공유서버 세션에서 조사). **실행 예정**: 4090 개발서버.
 > **목표**: TRELLIS.2 로 생성된 3D 에셋을 **재생성 없이** 부분 수정한다.
 > **범위**: B(Detail Variation) → C(Region Editing) 순차. 둘 다 필요하다는 사용자 확정.
-> 관련: `../../docs/A100_HANDOFF.md`, `../../docs/SERVER_4090_SETUP.md`,
+> 관련: `../../docs/SERVER_4090_SETUP.md`,
 > 프롬프트 최적화 맥락은 `prompt_lab/docs/EXPERIMENT_LOG.md` §10 (해당 실험은 종료, v1 확정).
 
 ---

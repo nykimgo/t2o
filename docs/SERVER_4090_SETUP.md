@@ -1,8 +1,10 @@
 # 4090 개발서버 복귀 셋팅 — A100 에서 달라진 점과 되돌릴 것
 
 > **작성**: 2026-08-04 (A100 공유서버 세션 실측). **독자**: 4090 개발서버에서 `edit3d` 작업을 이어받는 사람.
-> **관계**: `A100_HANDOFF.md` 는 **4090 → A100** 방향 문서다. 이 문서는 그 **역방향**이며,
-> A100 에서 진행된 작업(2026-07-28 ~ 08-04)이 4090 에서 돌게 하려면 무엇을 확인/조정해야 하는지를 적는다.
+> **범위**: A100 에서 진행된 작업(2026-07-28 ~ 08-04)이 4090 에서 돌게 하려면 무엇을 확인/조정해야 하는지.
+> **이 문서가 정본이다.** 구 `A100_HANDOFF.md`(4090→A100 방향)와 `FILE_TRANSFER_MANIFEST.md`(일회성 이관
+> 체크리스트)는 이관이 끝나 2026-08-04 에 삭제했고, 그 중 **아직 유효한 내용은 여기로 옮겼다**(§2-4, §7).
+> 환경 구축 절차 자체는 `../NEW_SERVER_SETUP.md` 와 `../ENV_REBUILD_GUIDE.md` 가 정본이다.
 > 계획 문서: `../edit3d/docs/PLAN.md`
 
 ---
@@ -72,7 +74,7 @@ python -c "import open3d; print(open3d.__version__)"
 ### 2-4. 컴파일 확장 arch
 
 A100 env 는 **sm_80** 으로 빌드됐다(`flash_attn`, `o_voxel`, `flex_gemm`, `cumesh` 등).
-4090 은 **sm_89** 다. `A100_HANDOFF.md` §2 가 이미 지적한 항목이며 **방향만 반대**다.
+4090 은 **sm_89** 다. 이 확장들은 arch 의존이라 GPU 가 바뀌면 재빌드가 필요할 수 있다.
 4090 에 기존 env 가 남아 있으면 그건 원래 sm_89 빌드이므로 **그대로 쓰면 된다.**
 새로 만들 경우에만 `TORCH_CUDA_ARCH_LIST=8.9` 로 재빌드.
 
@@ -103,7 +105,7 @@ A100 은 공유 서버라 동료와 겹치지 않게 **GPU 2번 단독**(`CUDA_V
 | `previz_pipeline/trellis_inference_core.py` | 2단계 종료 시 소요시간 요약 | |
 | `previz_pipeline/t2i_prompt_builder.py` | **신규 추적** (기존 미추적). §9 확정 시스템 프롬프트 = **v1 동결 대상** | 이번 캠페인 결론: 변경 근거 없음 |
 | `docs/RUN_GUIDE.md` | `rig_type` 정본을 최상위 형태로 갱신 | |
-| `docs/` 전체 | 신규 추적 (A100_HANDOFF / FILE_TRANSFER_MANIFEST / a100_reconstruct 등) | |
+| `docs/` 전체 | 신규 추적 (`RUN_GUIDE.md` / `a100_reconstruct/` / `claude_memory/` 등). 전역 `*.md` 규칙에 가려 여태 커밋되지 않고 있었다 | |
 
 > ⚠️ **`object_generate.sh` 는 이 repo 밖(`previs_proj/` 최상위)에 있어 push 에 포함되지 않는다.**
 > A100 에서 추가한 3단계 wall-clock 계측(`⏱️ 단계별 소요 시간`)이 4090 에는 없다. 필요하면 별도 이관.
@@ -160,3 +162,48 @@ T2I_GPU=0 ./object_generate.sh movie_usd/<movie>/<movie>.usda --no-filter -- --m
    (이상적인 헬멧·권총 이미지가 `valid=0.0`). `CLAUDE.md` §6 이 지시한 O/X → `--calibrate` 단계가 미수행.
 3. **목적함수 사각지대 3종** — 중복 객체 / 객체 정체성 / 시점. `EXPERIMENT_LOG.md` §10.9 결론 참조.
    프롬프트 최적화로는 해결 불가이며 지표를 고쳐야 한다.
+4. **NVML driver mismatch (4090 서버에서 발생 이력)** — `nvidia-smi` 가 "Driver/library version mismatch" 를
+   내면서 상주 `.to("cuda")` 가 assert 로 죽은 적이 있다(CPU offload 경로는 우회됨). 4090 복귀 시
+   **먼저 `nvidia-smi` 정상 출력과 기본 CUDA 할당을 확인할 것.**
+5. **CV `single_object` 오탐 (생명체)** — 펼친 날개·사지를 `multiple_objects` 로 오판한다.
+   생명체를 다룰 땐 `cv.thresholds.max_objects` 를 올려 soft-gate 로 쓴다.
+
+---
+
+## 7. 확정 T2I 시스템 프롬프트 (v1 동결) — 구 `A100_HANDOFF.md` §7 이관
+
+> **이 절이 repo 안에 남은 유일한 T2I 템플릿 근거다.** 상세 실험 기록(`prompt_lab/docs/EXPERIMENT_LOG.md`)은
+> `prompt_lab` 을 repo 에서 제외하면서 git 밖에 있다(§4). 4090 사본을 참조할 것.
+> 코드 구현: `previz_pipeline/t2i_prompt_builder.py`
+
+`category` / `rig_type` 으로 라우팅해 **두 갈래**를 쓴다.
+
+### ① 무생물 — 검증됨, **v1 동결**
+```
+{base_description}, {appearance}, {object}, single centered object, neutral background, full object visible in frame, unoccluded
+```
+- 근거: 8레코드 ablation + LOO 8/8. A100 에서 재현 확인(축별 순위 일치).
+- 2026-08 캠페인 결론: **반복 실행에서 후보 템플릿과의 차이가 LLM 표집 노이즈 안이었고, 실제 제작
+  레코드에서는 전 셀이 천장(0.90~1.00)에 몰려 구분이 불가능했다. 바꿀 근거가 없어 동결한다.**
+
+### ② 생명체 — ⚠️ **잠정값. 검증 안 됨**
+LLM 이 body-plan 을 `biped|quadruped|bird` 로 분류 → 아래 문구를 **verbatim 삽입**(창작 금지). 필드는 **object 만**.
+```
+{object}, <형태별 스캐폴딩>
+  biped:     in a symmetric A-pose, arms angled slightly down and away from the body,
+             legs straight and slightly apart, front view, neutral background, single object, full body
+  quadruped: standing naturally on all four legs, all four legs clearly separated and extended,
+             not tucked, side view, neutral background, single object, full body in frame
+  bird:      with wings fully spread symmetrically, standing, front view, neutral background,
+             single object, full body in frame
+```
+- 자세 기준은 후속 리깅 요구에서 나왔다(Tripo rig-type 참고 — 실제 리거로 Tripo 를 쓰는 건 아님).
+- **신뢰도**: 짧은 테스트로 "형태별 > 단일자세" 만 확인한 **잠정값**이다
+  (단일 A-pose 통일은 말=뒷발서기, 개구리=의인화로 붕괴했다).
+  정련하려면 **클래스별 사람 O/X 채점**이 필요하다 — **VQA 는 자세 품질을 판단하지 못한다**
+  (뒷발로 선 말을 자연기립보다 높게 줬다).
+- **2026-08 캠페인은 ①무생물만 다뤘다. ②는 그때 이후로 검증되지 않았다.**
+
+### ⚠️ 전이성
+프롬프트는 **모델·정밀도에 전이되지 않는다.** 위 값은 **FLUX.1-schnell bf16** 기준이다.
+같은 모델·bf16 이면 유효하고, fp8 등 정밀도나 모델이 바뀌면 **재검증이 필요하다.**

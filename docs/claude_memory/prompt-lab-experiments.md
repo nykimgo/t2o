@@ -44,6 +44,6 @@ metadata:
 **확정 설계 (2026-07, EXPERIMENT_LOG §9)**: category 라우팅 → 시스템 프롬프트 2개.
 - 무생물: 고정 템플릿(검증). 생명체: LLM 빌더 1콜(body-plan을 biped/quadruped/bird로 분류 + 고정 자세 스캐폴딩 verbatim 삽입, 창작 금지. object만). 자세 기준은 Tripo rig-type 참고(실제 리거로 쓰는 건 아님).
 - 생명체 자세 3종은 짧은 테스트 잠정값(형태별>A통일 확인: A통일은 말=뒷발서기/개구리=의인화 붕괴). 정련하려면 O/X 채점 필요(**VQA는 자세품질 판단 불가**).
-**A100 이관 (2026-07)**: 작업을 A100 공유 도커 서버로 옮김(동료 공유용 text→image→3D 환경 셋팅이 급선무). 핸드오프 문서 **`previs_proj/A100_HANDOFF.md`** 작성 — 맥락+env핀+A100차이(FLUX schnell 상주, fp8 불필요, sm_80 빌드)+확정 프롬프트2개+함정 총정리. A100은 80GB라 4090의 offload/NVML/fp8 문제 없음. ComfyUI는 최종산출물용(후순위).
+**A100 이관 (2026-07)**: 작업을 A100 공유 도커 서버로 옮김(동료 공유용 text→image→3D 환경 셋팅이 급선무). 핸드오프 문서 작성(구 `A100_HANDOFF.md` — 2026-08-04 삭제, 유효 내용은 `docs/SERVER_4090_SETUP.md` 로 이관) — 맥락+env핀+A100차이(FLUX schnell 상주, fp8 불필요, sm_80 빌드)+확정 프롬프트2개+함정 총정리. A100은 80GB라 4090의 offload/NVML/fp8 문제 없음. ComfyUI는 최종산출물용(후순위).
 
 - **(4090 한정) fp8 상주 모델** — FLUX schnell bf16 ~34G라 24GB 4090 상주 불가(offload로 장당 25-41s). fp8이면 상주+~2-3s. 옵션: Kijai/flux-fp8(transformer-only e4m3fn, from_single_file) 또는 optimum-quanto 즉석양자화(로컬 bf16 재사용, 무다운로드). 양자화는 프롬프트 재검증 필요(§9 원칙).
