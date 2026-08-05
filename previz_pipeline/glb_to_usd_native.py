@@ -37,7 +37,7 @@ from typing import Optional, Tuple
 import numpy as np
 import trimesh
 from PIL import Image
-from pxr import Usd, UsdGeom, UsdShade, Sdf, Gf
+from pxr import Usd, UsdGeom, UsdShade, Sdf, Gf, Vt
 
 # GLB 는 미터, usd_from_gltf 는 이 스케일로 USD 를 뽑았다(기준 파일 실측: ×100).
 _MESH_SCALE = 100.0
@@ -103,13 +103,16 @@ def convert(glb_path: str, out_usd: str, root_prim_name: str,
     bin_dir = out_usd_path.parent / "bin"
     tex_rel = _extract_base_texture(mesh, bin_dir, tex_name)
 
-    # pxr(boost.python)은 numpy.float32 스칼라를 Gf.Vec* 로 못 받는다.
-    # .tolist() 로 파이썬 float/int 로 내린 뒤 넣는다.
-    verts = np.asarray(mesh.vertices, dtype=np.float32).tolist()
-    faces = np.asarray(mesh.faces, dtype=np.int32).reshape(-1).tolist()
-    normals = np.asarray(mesh.vertex_normals, dtype=np.float32).tolist()
+    # 배열은 Vt.*Array.FromNumpy 로 numpy 를 통째로 벌크 복사한다(C++ 경로).
+    # .tolist() 후 요소마다 Gf.Vec3f(*p) 로 감싸면 81만 정점 기준 수백만 개
+    # boost.python 객체를 만들어 ~9초가 든다(FromNumpy 는 0.04초).
+    # 단, 스칼라 factor 만은 pxr 이 numpy.float32 를 Gf 로 못 받으므로
+    # _scalar_factor 에서 float() 로 내려 처리한다.
+    verts = np.ascontiguousarray(mesh.vertices, dtype=np.float32)
+    faces = np.ascontiguousarray(mesh.faces, dtype=np.int32).reshape(-1)
+    normals = np.ascontiguousarray(mesh.vertex_normals, dtype=np.float32)
     uv = mesh.visual.uv
-    uv = None if uv is None else np.asarray(uv, dtype=np.float32).tolist()
+    uv = None if uv is None else np.ascontiguousarray(uv, dtype=np.float32)
     n_faces = len(faces) // 3
 
     stage = Usd.Stage.CreateNew(str(out_usd_path))
@@ -165,10 +168,11 @@ def convert(glb_path: str, out_usd: str, root_prim_name: str,
 
     gm = UsdGeom.Mesh.Define(
         stage, f"/{object_name}/Meshes/world/geometry_0/geometry_0")
-    gm.CreatePointsAttr([Gf.Vec3f(*p) for p in verts])
-    gm.CreateFaceVertexCountsAttr([3] * n_faces)
-    gm.CreateFaceVertexIndicesAttr(faces)
-    gm.CreateNormalsAttr([Gf.Vec3f(*n) for n in normals])
+    gm.CreatePointsAttr(Vt.Vec3fArray.FromNumpy(verts))
+    gm.CreateFaceVertexCountsAttr(
+        Vt.IntArray.FromNumpy(np.full(n_faces, 3, dtype=np.int32)))
+    gm.CreateFaceVertexIndicesAttr(Vt.IntArray.FromNumpy(faces))
+    gm.CreateNormalsAttr(Vt.Vec3fArray.FromNumpy(normals))
     gm.SetNormalsInterpolation(UsdGeom.Tokens.vertex)
     gm.CreateSubdivisionSchemeAttr(UsdGeom.Tokens.none)
     gm.CreateExtentAttr(UsdGeom.PointBased(gm).ComputeExtent(gm.GetPointsAttr().Get()))
@@ -176,7 +180,7 @@ def convert(glb_path: str, out_usd: str, root_prim_name: str,
     if uv is not None:
         st_pv = UsdGeom.PrimvarsAPI(gm.GetPrim()).CreatePrimvar(
             "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.varying)
-        st_pv.Set([Gf.Vec2f(*t) for t in uv])
+        st_pv.Set(Vt.Vec2fArray.FromNumpy(uv))
 
     UsdShade.MaterialBindingAPI.Apply(gm.GetPrim())
     UsdShade.MaterialBindingAPI(gm.GetPrim()).Bind(material)
