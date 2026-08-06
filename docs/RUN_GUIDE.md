@@ -76,7 +76,7 @@ T2I_GPU=1 ./object_generate.sh movie_usd/hidden_time/hidden_time.usda --no-filte
 | `conda activate trellis2` 선(先)활성화 | 런처는 activate 안 함 |
 | 입력은 **루트 USD**(`hidden_time.usda`) | shot 경로(`.../shot_1/objects/object_1.usda`)를 직접 주면 meta-only override 라 `필수 정보 0개` 로 끝난다. 루트에서 시작해야 scene canonical 이 잡힌다 |
 | `--no-filter` (현재) | `--filter`/`--translate` 는 ollama 가 필요한데 **이 서버엔 아직 ollama 가 안 떠 있다**(§4). 안 붙이면 USD 의 en/description 을 직접 쓴다 |
-| `T2I_GPU=1` | FLUX 를 별도 A100(인덱스 1)에 올려 TRELLIS.2(인덱스 0)와 카드 분리. 80GB 라 한 카드 공유도 OOM 은 안 나지만, 분리가 깔끔·빠름 |
+| `T2I_GPU=1` | FLUX 를 별도 GPU(인덱스 1)에 올려 TRELLIS.2(인덱스 0)와 카드 분리. **4090(24GB): 필수** — TRELLIS.2 상주(~23GB)+FLUX(~23.4GB peak)가 한 카드를 공유하면 OOM(실측). A100(80GB): 공유해도 OOM 은 안 나지만 분리가 깔끔·빠름. ⚠️ TRELLIS.2 가 쓰는 인덱스 0 은 **주지 말 것**(같은 카드라 충돌) |
 
 ### 주요 환경변수 (전부 선택 — 기본값으로 동작)
 | 변수 | 기본값 | 설명 |
@@ -127,6 +127,11 @@ body-plan(rig_type/키워드 dict)으로 무생물/생명체를 라우팅한다:
 > 강제 자세와 충돌한 ablation 관찰에서 나왔고(그건 filter 정제로 완화됨), 현재는 정체성 보존을 우선한다.
 
 ### rig_type 필드 (업스트림 권위)
+
+> ⚠️ **경로 표기는 확정 예정.** 아래는 "최상위"로 적혀 있으나, 의도분석 담당자와 논의된 값은
+> `object xform` > `etc` > `rig_type` 이다(`docs/CONTEXT.md` §4). 최종 합의 후 이 절을 갱신한다.
+> 코드 `_resolve_rig_type()` 은 최상위·`etc` 중첩·자식 prim `etc` 를 **모두 읽으므로 어느 쪽이든 동작한다.**
+
 object customData **최상위 `string rig_type`** 에 `biped|quadruped|bird|insect|static_object` 가
 들어오면 그 값을 신뢰해 라우팅한다(`static_object`=무생물). **없으면 객체명 키워드 dict 로 폴백.**
 ```usda

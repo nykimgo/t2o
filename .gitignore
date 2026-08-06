@@ -432,3 +432,6 @@ trellis2_src/
 # 상세: docs/SERVER_4090_SETUP.md §4
 prompt_lab/
 prompt_lab.sh
+
+# edit3d 실험 산출물(GLB/이미지, ~1.2GB) — 결과 JSON/문서만 추적
+edit3d/phase*_out/

@@ -1,0 +1,12 @@
+{
+  "_comment": "Phase 0-4 고정 평가세트. hidden_time 캠페인 산출 GLB. 성공(상세 37~41MB)/실패의심(퇴화 <1.4MB) 혼합. 경로는 repo 루트(t2o_pipeline) 기준 ../movie_usd.",
+  "root": "/home/sr/previs_proj/movie_usd/hidden_time/scene_1/objects/assets",
+  "items": [
+    {"id": "car_big",      "category": "vehicle", "geometry": "bulky",      "quality": "detailed",  "bytes": 37430764, "path": "object_3/scene_1_car_487159.glb"},
+    {"id": "car_small",    "category": "vehicle", "geometry": "bulky",      "quality": "degenerate","bytes": 1324336,  "path": "object_3/scene_1_car_299645.glb"},
+    {"id": "phone_big",    "category": "phone",   "geometry": "thin_flat",  "quality": "detailed",  "bytes": 37822208, "path": "object_2/scene_1_smartphone_22565.glb"},
+    {"id": "phone_small",  "category": "phone",   "geometry": "thin_flat",  "quality": "degenerate","bytes": 958316,   "path": "object_2/scene_1_smartphone_459807.glb"},
+    {"id": "bird_a",       "category": "bird",    "geometry": "appendage",  "quality": "detailed",  "bytes": 41877584, "path": "object_1/scene_1_seagull_209626.glb"},
+    {"id": "bird_b",       "category": "bird",    "geometry": "appendage",  "quality": "detailed",  "bytes": 39042060, "path": "object_1/scene_1_seagull_775984.glb"}
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "asset": "scene_1_seagull_209626.glb",
+  "seed": 42,
+  "grid": 64,
+  "tokens": 8384,
+  "edit_tokens": 1995,
+  "edit_axis": 0,
+  "latent": {
+    "outside_max_abs_delta": 0.0,
+    "inside_mean_abs_delta": 2.5013
+  },
+  "occupancy64": {
+    "inside_iou": 0.99,
+    "outside_iou": 1.0,
+    "inside_n": [
+      2142,
+      2141
+    ],
+    "outside_n": [
+      6230,
+      6230
+    ]
+  },
+  "mesh": {
+    "chamfer": 0.00316,
+    "silhouette_iou": 0.992
+  },
+  "peak_vram_gb": 7.62
+}

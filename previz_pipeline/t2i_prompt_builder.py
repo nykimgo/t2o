@@ -204,6 +204,18 @@ def build_t2i_prompt(object_name: Optional[str], appearance: Optional[str],
         return _creature_prompt(obj, SCAFFOLDING[rt], base_description), rt
 
     # 2) 폴백: 결정론적 키워드 dict
+    # rig_type 은 업스트림(의도분석) 의무 필드다 — 무생물도 static_object 로 채우기로
+    # 합의돼 있어 "값 없음"은 정상 상태가 아니라 계약 위반이다. 조용히 폴백하면
+    # 일부 객체만 누락됐을 때 아무도 알아채지 못하므로 반드시 남긴다.
+    if rig_type is None or not str(rig_type).strip():
+        logging.warning(
+            "[t2i_prompt] rig_type 없음(업스트림 미제공) → 키워드 폴백 사용: "
+            "name=%r category=%r", object_name, category)
+    else:
+        logging.warning(
+            "[t2i_prompt] rig_type 미지값 %r → 키워드 폴백 사용 (허용값: %s): name=%r",
+            rig_type, "|".join(sorted(VALID_RIG_TYPES)), object_name)
+
     if is_creature(object_name, category, target):
         plan = classify_body_plan(object_name, category, target)
         return _creature_prompt(obj, SCAFFOLDING[plan], base_description), plan

@@ -130,9 +130,12 @@ def _derive_next_base(prim_path_str: str, base_path: Optional[List[str]], child_
 # description 후보에서 제외할 USD 스키마 노이즈 필드 (예: pxr가 자동 생성하는 문서 주석)
 _DESCRIPTION_NOISE_FIELDS = ("userDocBrief",)
 
-# 업스트림(의도분석) 리깅 분류 필드. object customData 최상위에
+# 업스트림(의도분석) 리깅 분류 필드.
+# ⚠️ 경로 표기 확정 예정: 아래 주석은 "최상위"로 적혀 있으나 담당자와 논의된 값은
+#    object xform > etc > rig_type 이다(docs/CONTEXT.md §4). 최종 합의 후 갱신한다.
+#    _resolve_rig_type() 이 세 인코딩을 모두 읽으므로 어느 쪽이든 동작한다.
 # `string rig_type` = biped|quadruped|bird|insect|static object 로 들어온다.
-# (정본 = 의도분석 모듈 실제 산출 형태, 2026-07-28 확정. 구 `etc.rig_type` 중첩 dict 형태도 계속 읽는다.)
+# (구 `etc.rig_type` 중첩 dict 형태도 계속 읽는다.)
 _VALID_RIG_TYPES = {"biped", "quadruped", "bird", "insect", "static_object"}
 
 
@@ -148,9 +151,11 @@ def _normalize_rig_type(value) -> str:
 
 def _resolve_rig_type(custom_data: Dict, prim=None) -> str:
     """object 의 rig_type 을 여러 인코딩에서 견고하게 찾는다.
-    ① customData 최상위 `rig_type` (정본 — 의도분석 모듈 산출 형태)
-    ② customData 중첩 dict `etc.rig_type` (구 형태, 하위호환)
-    ③ (pxr) 자식 prim `etc` 의 customData/attribute `rig_type`."""
+    ① customData 최상위 `rig_type`
+    ② customData 중첩 dict `etc.rig_type`  ← 담당자와 논의된 형태(docs/CONTEXT.md §4)
+    ③ (pxr) 자식 prim `etc` 의 customData/attribute `rig_type`.
+
+    어느 것이 정본인지는 확정 예정. 셋 다 읽으므로 동작에는 영향 없다."""
     if isinstance(custom_data, dict):
         rt = _normalize_rig_type(custom_data.get("rig_type"))
         if rt:

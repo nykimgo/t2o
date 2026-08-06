@@ -1,0 +1,191 @@
+{
+  "config": {
+    "shape_res": 1024,
+    "ss_res": 32,
+    "enc": "shape_enc_next_dc_f16c32_fp16",
+    "dec": "shape_dec_next_dc_f16c32_fp16",
+    "peak_vram_gb": 18.15
+  },
+  "results": [
+    {
+      "id": "car_big",
+      "category": "vehicle",
+      "geometry": "bulky",
+      "quality": "detailed",
+      "path": "object_3/scene_1_car_487159.glb",
+      "orig_verts": 720864,
+      "orig_faces": 941350,
+      "slat_voxels": 26750,
+      "decoded_verts": 14153311,
+      "decoded_faces": 28349864,
+      "chamfer": {
+        "chamfer": 0.005296098266975919,
+        "a_to_b": 0.005295551939756299,
+        "b_to_a": 0.005296644594195539,
+        "hausdorff": 0.0193473267137246
+      },
+      "silhouette": {
+        "silhouette_iou": 0.9968289207578911,
+        "per_view": [
+          0.998499861829379,
+          0.9942390542029856,
+          0.9977478462413084
+        ]
+      },
+      "coords_iou_ss": 1.0,
+      "coords_orig_n": 5532,
+      "coords_dec_n": 5532,
+      "seconds": 74.8
+    },
+    {
+      "id": "car_small",
+      "category": "vehicle",
+      "geometry": "bulky",
+      "quality": "degenerate",
+      "path": "object_3/scene_1_car_299645.glb",
+      "orig_verts": 6206,
+      "orig_faces": 8834,
+      "slat_voxels": 7093,
+      "decoded_verts": 1840222,
+      "decoded_faces": 3681244,
+      "chamfer": {
+        "chamfer": 0.002645887474562812,
+        "a_to_b": 0.002646915514129828,
+        "b_to_a": 0.0026448594349957966,
+        "hausdorff": 0.01106213213743557
+      },
+      "silhouette": {
+        "silhouette_iou": 0.9984054278682805,
+        "per_view": [
+          0.9988465974625144,
+          0.9970055805090513,
+          0.9993641056332759
+        ]
+      },
+      "coords_iou_ss": 1.0,
+      "coords_orig_n": 1663,
+      "coords_dec_n": 1663,
+      "seconds": 19.3
+    },
+    {
+      "id": "phone_big",
+      "category": "phone",
+      "geometry": "thin_flat",
+      "quality": "detailed",
+      "path": "object_2/scene_1_smartphone_22565.glb",
+      "orig_verts": 702558,
+      "orig_faces": 963704,
+      "slat_voxels": 20806,
+      "decoded_verts": 10672409,
+      "decoded_faces": 21376704,
+      "chamfer": {
+        "chamfer": 0.0048495876949765605,
+        "a_to_b": 0.004858192957674897,
+        "b_to_a": 0.004840982432278224,
+        "hausdorff": 0.018630831402625777
+      },
+      "silhouette": {
+        "silhouette_iou": 0.9971729538342795,
+        "per_view": [
+          0.9960763331549849,
+          0.9955383505019356,
+          0.999904177845918
+        ]
+      },
+      "coords_iou_ss": 1.0,
+      "coords_orig_n": 4605,
+      "coords_dec_n": 4605,
+      "seconds": 48.3
+    },
+    {
+      "id": "phone_small",
+      "category": "phone",
+      "geometry": "thin_flat",
+      "quality": "degenerate",
+      "path": "object_2/scene_1_smartphone_459807.glb",
+      "orig_verts": 3758,
+      "orig_faces": 6864,
+      "slat_voxels": 4720,
+      "decoded_verts": 1233610,
+      "decoded_faces": 2467266,
+      "chamfer": {
+        "chamfer": 0.0023722752697559503,
+        "a_to_b": 0.0023727179583819874,
+        "b_to_a": 0.0023718325811299132,
+        "hausdorff": 0.008672540343855787
+      },
+      "silhouette": {
+        "silhouette_iou": 0.9997687861271677,
+        "per_view": [
+          0.9993063583815028,
+          1.0,
+          1.0
+        ]
+      },
+      "coords_iou_ss": 1.0,
+      "coords_orig_n": 1152,
+      "coords_dec_n": 1152,
+      "seconds": 4.6
+    },
+    {
+      "id": "bird_a",
+      "category": "bird",
+      "geometry": "appendage",
+      "quality": "detailed",
+      "path": "object_1/scene_1_seagull_209626.glb",
+      "orig_verts": 818811,
+      "orig_faces": 999948,
+      "slat_voxels": 8384,
+      "decoded_verts": 4920901,
+      "decoded_faces": 9885486,
+      "chamfer": {
+        "chamfer": 0.0030776841665451993,
+        "a_to_b": 0.0030874300287667055,
+        "b_to_a": 0.0030679383043236935,
+        "hausdorff": 0.012592502252300658
+      },
+      "silhouette": {
+        "silhouette_iou": 0.991937953170081,
+        "per_view": [
+          0.9928729526339088,
+          0.9920003595344029,
+          0.9909405473419314
+        ]
+      },
+      "coords_iou_ss": 1.0,
+      "coords_orig_n": 1909,
+      "coords_dec_n": 1909,
+      "seconds": 32.5
+    },
+    {
+      "id": "bird_b",
+      "category": "bird",
+      "geometry": "appendage",
+      "quality": "detailed",
+      "path": "object_1/scene_1_seagull_775984.glb",
+      "orig_verts": 776019,
+      "orig_faces": 992473,
+      "slat_voxels": 2365,
+      "decoded_verts": 1335801,
+      "decoded_faces": 2676200,
+      "chamfer": {
+        "chamfer": 0.001871237129550275,
+        "a_to_b": 0.0018710564634317518,
+        "b_to_a": 0.0018714177956687982,
+        "hausdorff": 0.006184438667532483
+      },
+      "silhouette": {
+        "silhouette_iou": 0.9932337068620297,
+        "per_view": [
+          0.9949012109623965,
+          0.989968080255358,
+          0.9948318293683347
+        ]
+      },
+      "coords_iou_ss": 1.0,
+      "coords_orig_n": 542,
+      "coords_dec_n": 542,
+      "seconds": 18.6
+    }
+  ]
+}

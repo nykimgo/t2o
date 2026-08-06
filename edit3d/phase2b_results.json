@@ -1,0 +1,23 @@
+{
+  "asset": "scene_1_seagull_209626.glb",
+  "seed": 42,
+  "grid": 64,
+  "axis": 0,
+  "thr": 40.0,
+  "tokens": 8384,
+  "removal": {
+    "removed_tokens": 1995,
+    "heal_band": 1019,
+    "bbox_occ_before": 1994,
+    "bbox_occ_after": 0,
+    "unedited_iou": 1.0
+  },
+  "addition": {
+    "extra_voxels": 2200,
+    "blend_band": 259,
+    "bbox_occ_before": 0,
+    "bbox_occ_after": 2200,
+    "unedited_iou": 0.802
+  },
+  "peak_vram_gb": 8.62
+}

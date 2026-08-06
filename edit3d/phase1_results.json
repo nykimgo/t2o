@@ -1,0 +1,63 @@
+{
+  "asset": "scene_1_seagull_209626.glb",
+  "ss_res": 32,
+  "seeds": [
+    42,
+    123,
+    777
+  ],
+  "coords": {
+    "A_ss_n": 1858,
+    "B_voxel_n": 1909,
+    "iou_A_B": 0.344
+  },
+  "A_captured": {
+    "baseline_vs_orig": {
+      "chamfer": 0.02639,
+      "silhouette_iou": 0.745,
+      "aspect_l1": 0.1734
+    },
+    "variant_vs_baseline": {
+      "123": {
+        "chamfer": 0.00435,
+        "silhouette_iou": 0.97,
+        "aspect_l1": 0.0058
+      },
+      "777": {
+        "chamfer": 0.00433,
+        "silhouette_iou": 0.965,
+        "aspect_l1": 0.0099
+      }
+    },
+    "interseed_pairwise_mean": {
+      "chamfer": 0.00447,
+      "silhouette_iou": 0.967
+    }
+  },
+  "B_product": {
+    "variant_vs_orig": {
+      "42": {
+        "chamfer": 0.00572,
+        "silhouette_iou": 0.938,
+        "aspect_l1": 0.0315
+      },
+      "123": {
+        "chamfer": 0.00556,
+        "silhouette_iou": 0.938,
+        "aspect_l1": 0.0431
+      },
+      "777": {
+        "chamfer": 0.0054,
+        "silhouette_iou": 0.937,
+        "aspect_l1": 0.0374
+      }
+    }
+  },
+  "exports": [
+    "edit3d/phase1_out/orig.glb",
+    "edit3d/phase1_out/A_baseline.glb",
+    "edit3d/phase1_out/A_seed123.glb",
+    "edit3d/phase1_out/B_seed42.glb"
+  ],
+  "peak_vram_gb": 4.32
+}

@@ -145,8 +145,10 @@ python -c "import open3d" 2>/dev/null && echo "open3d 있음" || echo "open3d �
 #    - 스크립트의 CUDA_VISIBLE_DEVICES=2 제거
 
 # 4) 파이프라인 스모크 (1객체)
-T2I_GPU=0 ./object_generate.sh movie_usd/<movie>/<movie>.usda --no-filter -- --max_items 1
+#    ⚠️ T2I_GPU 는 TRELLIS.2(GPU 0 상주)와 다른 카드를 줘야 한다. T2I_GPU=0 은 같은 카드 공유라 OOM.
+T2I_GPU=1 ./object_generate.sh movie_usd/<movie>/<movie>.usda --no-filter -- --max_items 1
 #    기대: offload 경로, 장당 25~41초. 상주(2.5초)는 A100 기준이므로 여기선 안 나온다.
+#    실측(2026-08-04, seagull 1객체): 1/1 성공, avg 71.1s(저장 40.7s 포함), 40MB GLB. 상세 §6-6.
 
 # 5) edit3d Phase 0 착수 → edit3d/docs/PLAN.md §2
 ```
@@ -167,6 +169,12 @@ T2I_GPU=0 ./object_generate.sh movie_usd/<movie>/<movie>.usda --no-filter -- --m
    **먼저 `nvidia-smi` 정상 출력과 기본 CUDA 할당을 확인할 것.**
 5. **CV `single_object` 오탐 (생명체)** — 펼친 날개·사지를 `multiple_objects` 로 오판한다.
    생명체를 다룰 땐 `cv.thresholds.max_objects` 를 올려 soft-gate 로 쓴다.
+6. **스모크 OOM — `T2I_GPU=0` 충돌 (2026-08-04 실측·해결)** — TRELLIS.2 는 GPU 0 에 상주(추론 peak ~23GB)
+   하는데, FLUX(T2I)는 offload 여도 peak ~23.4GB 라 **같은 24GB 카드를 공유하면 OOM**
+   (`trellis2_inference_core.py:160` 주석 참조). 구 §5-4 예시의 `T2I_GPU=0` 이 바로 이 충돌을 일으켰다.
+   → **`T2I_GPU` 는 GPU 1~3 중 하나**로 FLUX 를 분리한다. `T2I_GPU=1` 로 재실행 시 1/1 성공
+   (avg 71.1s, 저장 40.7s 포함, seagull 40MB GLB). RUN_GUIDE §"반드시 지킬 것" 표에도 반영함.
+   A100(80GB)에서는 공유해도 OOM 안 나므로 이 이슈는 4090 전용이다.
 
 ---
 
