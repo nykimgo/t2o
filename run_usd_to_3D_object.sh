@@ -5,16 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: run_usd_to_3D_object.sh <usd_file> <output_dir> [--model <trellis_model>] [--translate] [--filter] [-- <extra_trellis_args>]
+Usage: run_usd_to_3D_object.sh <usd_file> <output_dir> [--model <trellis_model>] [--filter] [-- <extra_trellis_args>]
 
 Arguments:
   --model <model_path>   TRELLIS 모델 경로 또는 HF 모델명 (예: microsoft/TRELLIS-text-large)
-  --translate            1단계 번역 활성화 (USD ko → LLM 영어 번역; 미지정 시 USD en 직접 사용)
-  --filter               2단계 필터링 활성화 (프롬프트 증강)
+  --filter               필터링 활성화 (캡션 정제 LLM)
 
 Environment variables:
-  OLLAMA_MODEL           1단계 번역용 Ollama 모델명 (기본: gemma3:12b)
-  OLLAMA_FILTER_MODEL    2단계 필터링용 Ollama 모델명 (기본: gemma3:12b)
+  OLLAMA_FILTER_MODEL    필터링용 Ollama 모델명 (기본: gemma3:4b)
   OLLAMA_BASE_URL        Ollama 서버 URL (기본: unset)
   PARSE_TYPE             usd_parse_and_augment 파싱 타입 (object|actor|both, 기본: object)
   TRELLIS_MODEL_PATH     TRELLIS 모델 경로 또는 HF 모델명 (기본: microsoft/TRELLIS-text-base)
@@ -23,23 +21,20 @@ Environment variables:
 
 JSON 경로는 자동 생성됩니다: {output_dir}/{model_name}/{YYYYMMDD}/run_{HHMMSS}_{flags}/usd_results.json
 
-참고: 기본 실행은 USD customData의 en 필드를 TRELLIS 프롬프트로 사용합니다.
-      --translate 를 붙이면 ko 필드를 LLM으로 번역합니다. --filter 는 영어 프롬프트를 증강합니다.
+참고: 프롬프트는 USD customData의 en 필드를 직접 사용합니다 (ko→en LLM 번역 스테이지는 제거됨).
+      --filter 를 붙이면 캡션 정제 LLM(필터)이 프롬프트를 다듬습니다.
 
 예시:
   # 기본 실행 (USD en 직접 사용, LLM 없음)
   ./run_usd_to_3D_object.sh scene.usda /mnt/output
 
-  # 1단계 번역만 활성화
-  ./run_usd_to_3D_object.sh scene.usda /mnt/output --translate
-
-  # 1단계 번역 + 2단계 필터링 활성화
-  ./run_usd_to_3D_object.sh scene.usda /mnt/output --translate --filter
+  # 필터링 활성화
+  ./run_usd_to_3D_object.sh scene.usda /mnt/output --filter
 
   # 환경변수로 모델 지정
-  OLLAMA_MODEL=gemma3:12b OLLAMA_FILTER_MODEL=gemma3:12b \
+  OLLAMA_FILTER_MODEL=gemma3:12b \
     TRELLIS_MODEL_PATH=microsoft/TRELLIS-text-large \
-    ./run_usd_to_3D_object.sh scene.usda /mnt/output --translate --filter
+    ./run_usd_to_3D_object.sh scene.usda /mnt/output --filter
 
   # TRELLIS 모델만 인자로 지정
   ./run_usd_to_3D_object.sh scene.usda /mnt/output --model microsoft/TRELLIS-text-large
@@ -58,9 +53,8 @@ USD_FILE="$1"
 OUTPUT_DIR="$2"
 shift 2
 
-# --model, --translate, --filter 옵션 파싱
+# --model, --filter 옵션 파싱
 TRELLIS_MODEL_ARG=""
-ENABLE_TRANSLATE=false
 ENABLE_FILTER=false
 TRELLIS_EXTRA_ARGS=()
 while [[ $# -gt 0 ]]; do
@@ -72,10 +66,6 @@ while [[ $# -gt 0 ]]; do
       fi
       TRELLIS_MODEL_ARG="$2"
       shift 2
-      ;;
-    --translate)
-      ENABLE_TRANSLATE=true
-      shift
       ;;
     --filter)
       ENABLE_FILTER=true
@@ -93,7 +83,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-OLLAMA_MODEL="${OLLAMA_MODEL:-gemma3:4b}"
 OLLAMA_FILTER_MODEL="${OLLAMA_FILTER_MODEL:-gemma3:4b}"
 PARSE_TYPE="${PARSE_TYPE:-object}"
 # --model 인자 > 환경변수 > 기본값 순으로 TRELLIS 모델을 확정합니다.
@@ -127,12 +116,12 @@ TRELLIS_EXTRA_ARGS=("${FILTERED_TRELLIS_EXTRA_ARGS[@]}")
 
 TRELLIS_BASE_OUTPUT="${TRELLIS_BASE_OUTPUT:-${OUTPUT_DIR}}"
 
-# Ollama 서버 자동 시작 (번역 또는 필터링이 활성화된 경우에만)
+# Ollama 서버 자동 시작 (필터링이 활성화된 경우에만)
 OLLAMA_API_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
 OLLAMA_STARTED_BY_SCRIPT=false
 
-# 번역 또는 필터링이 활성화된 경우에만 Ollama 서버 확인/시작
-if [[ "${ENABLE_TRANSLATE}" == "true" ]] || [[ "${ENABLE_FILTER}" == "true" ]]; then
+# 필터링이 활성화된 경우에만 Ollama 서버 확인/시작
+if [[ "${ENABLE_FILTER}" == "true" ]]; then
     # OLLAMA_BASE_URL이 설정되지 않았거나 localhost인 경우에만 로컬 ollama 확인/시작
     if [[ -z "${OLLAMA_BASE_URL:-}" ]] || [[ "${OLLAMA_BASE_URL}" == "http://localhost:11434" ]] || [[ "${OLLAMA_BASE_URL}" == "localhost:11434" ]]; then
     # Ollama가 실행 중인지 확인
@@ -178,7 +167,7 @@ if [[ "${ENABLE_TRANSLATE}" == "true" ]] || [[ "${ENABLE_FILTER}" == "true" ]]; 
         echo "ℹ️ 원격 Ollama 서버 사용: ${OLLAMA_BASE_URL}"
     fi
 else
-    echo "ℹ️ LLM 번역이 비활성화되어 Ollama 서버를 시작하지 않습니다."
+    echo "ℹ️ LLM 필터링이 비활성화되어 Ollama 서버를 시작하지 않습니다."
 fi
 
 # 스크립트 종료 시 정리 함수
@@ -200,12 +189,8 @@ MODEL_NAME=$(basename "${TRELLIS_MODEL_PATH}")
 CURRENT_DATE=$(date +%Y%m%d)
 CURRENT_TIME=$(date +%H%M%S)
 
-# run 폴더 flags: en | en-filter | ko-translate | ko-translate-filter
-if [[ "${ENABLE_TRANSLATE}" == "true" ]]; then
-  RUN_FLAGS="ko-translate"
-else
-  RUN_FLAGS="en"
-fi
+# run 폴더 flags: en | en-filter
+RUN_FLAGS="en"
 if [[ "${ENABLE_FILTER}" == "true" ]]; then
   RUN_FLAGS="${RUN_FLAGS}-filter"
 fi
@@ -219,13 +204,12 @@ mkdir -p "${RUN_DIR}"
 
 PIPELINE_CMD="${0} ${USD_FILE} ${OUTPUT_DIR}"
 [[ -n "${TRELLIS_MODEL_ARG}" ]] && PIPELINE_CMD+=" --model ${TRELLIS_MODEL_ARG}"
-[[ "${ENABLE_TRANSLATE}" == "true" ]] && PIPELINE_CMD+=" --translate"
 [[ "${ENABLE_FILTER}" == "true" ]] && PIPELINE_CMD+=" --filter"
 
 # run provenance 기록
 MANIFEST_PATH="${RUN_DIR}/run_manifest.json"
 RUN_ID="${RUN_ID}" USD_FILE="${USD_FILE}" TRELLIS_MODEL_PATH="${TRELLIS_MODEL_PATH}" \
-  ENABLE_TRANSLATE="${ENABLE_TRANSLATE}" ENABLE_FILTER="${ENABLE_FILTER}" PARSE_TYPE="${PARSE_TYPE}" \
+  ENABLE_FILTER="${ENABLE_FILTER}" PARSE_TYPE="${PARSE_TYPE}" \
   OUTPUT_JSON="${OUTPUT_JSON}" RUN_DIR="${RUN_DIR}" MANIFEST_PATH="${MANIFEST_PATH}" \
   PIPELINE_CMD="${PIPELINE_CMD}" \
   python3 <<'PYMANIFEST'
@@ -240,7 +224,6 @@ manifest = {
     "usd_file": os.path.abspath(os.environ["USD_FILE"]),
     "trellis_model": os.environ["TRELLIS_MODEL_PATH"],
     "options": {
-        "translate": os.environ["ENABLE_TRANSLATE"] == "true",
         "filter": os.environ["ENABLE_FILTER"] == "true",
         "parse_type": os.environ["PARSE_TYPE"],
     },
@@ -281,24 +264,16 @@ if [[ ! -f "${USD_FILE}" ]]; then
   exit 1
 fi
 
-echo "🔄 1/2 USD 파싱 및 프롬프트 증강 실행"
-if [[ "${ENABLE_TRANSLATE}" == "true" ]]; then
-  echo "   1단계 번역: 활성화 (모델: ${OLLAMA_MODEL})"
-else
-  echo "   1단계 번역: 비활성화"
-fi
+echo "🔄 1/3 USD 파싱 및 프롬프트 증강 실행 (프롬프트: USD en 필드)"
 if [[ "${ENABLE_FILTER}" == "true" ]]; then
-  echo "   2단계 필터링: 활성화 (모델: ${OLLAMA_FILTER_MODEL})"
+  echo "   필터링: 활성화 (모델: ${OLLAMA_FILTER_MODEL})"
 else
-  echo "   2단계 필터링: 비활성화"
+  echo "   필터링: 비활성화"
 fi
 # PYTHONPATH를 프로젝트 루트로 설정하여 trellis 모듈 import 가능하도록 함
-USD_CMD=(python "${USD_SCRIPT}" "${USD_FILE}" --output "${OUTPUT_JSON}" --type "${PARSE_TYPE}" --model "${OLLAMA_MODEL}" --filter-model "${OLLAMA_FILTER_MODEL}")
+USD_CMD=(python "${USD_SCRIPT}" "${USD_FILE}" --output "${OUTPUT_JSON}" --type "${PARSE_TYPE}" --filter-model "${OLLAMA_FILTER_MODEL}")
 if [[ -n "${OLLAMA_BASE_URL:-}" ]]; then
   USD_CMD+=(--base-url "${OLLAMA_BASE_URL}")
-fi
-if [[ "${ENABLE_TRANSLATE}" == "true" ]]; then
-  USD_CMD+=(--translate)
 fi
 if [[ "${ENABLE_FILTER}" == "true" ]]; then
   USD_CMD+=(--filter)

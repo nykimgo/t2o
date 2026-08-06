@@ -36,13 +36,13 @@ cd /root/previs_proj/t2o_pipeline
   /root/previs_proj/movie_usd/hidden_time/hidden_time.usda \
   /root/previs_proj/t2o_pipeline/t2o_results
 
-# 한국어 description 번역 + 프롬프트 증강까지 사용
-ollama pull gemma3:4b   # 최초 1회 (OLLAMA_MODEL 변경 시 해당 모델 pull)
+# 캡션 정제 필터(LLM)까지 사용
+ollama pull gemma3:4b   # 최초 1회 (OLLAMA_FILTER_MODEL 변경 시 해당 모델 pull)
 ./run_usd_to_3D_object.sh \
   /root/previs_proj/movie_usd/hidden_time/hidden_time.usda \
   /root/previs_proj/t2o_pipeline/t2o_results \
-  --translate --filter
-# 참고: ollama serve는 생략 가능 — --translate/--filter 사용 시 스크립트가 자동으로 시작/종료합니다.
+  --filter
+# 참고: ollama serve는 생략 가능 — --filter 사용 시 스크립트가 자동으로 시작/종료합니다.
 ```
 
 **통합 파이프라인 (권장)**
@@ -54,7 +54,7 @@ cd /root/previs_proj
 ./run_previs_pipeline.sh
 
 # t2o만 켜서 실행 (USD는 이미 생성된 경우)
-./run_previs_pipeline.sh --skip-intent --skip-usd --skip-space --t2o-translate --t2o-filter
+./run_previs_pipeline.sh --skip-intent --skip-usd --skip-space --t2o-filter
 ```
 
 > 본 파이프라인은 결과 에셋을 **원본 USD 폴더 구조 안(`scene_n/objects/assets/`)** 에 저장하고, **원본 `object_n.usda` 파일에 직접 reference를 주입**합니다. 따라서 root/scene/shot/개별 object 어느 USD를 3D 툴(Blender, USD Viewer)에서 열어도 생성된 에셋이 함께 보입니다.
@@ -71,9 +71,8 @@ cd /root/previs_proj
 
 **1. Stage 1: USD Parse & Augment**
 
-  * **Role:** 원본 USD를 파싱하여 `Object` 계층 구조와 description 메타데이터를 추출하고, (옵션) Ollama(LLM)로 프롬프트를 번역/증강합니다. (`Actor` 파싱은 현재 `ENABLE_ACTOR_PARSING=False`로 비활성)
-      * **기본 (옵션 없음):** USD customData의 `en` 필드를 TRELLIS 프롬프트로 사용합니다 (LLM 불필요).
-      * **Translation (`--translate`):** USD `ko` 필드를 LLM으로 영어 번역합니다.
+  * **Role:** 원본 USD를 파싱하여 `Object` 계층 구조와 description 메타데이터를 추출하고, (옵션) Ollama(LLM)로 캡션을 정제합니다. (`Actor` 파싱은 현재 `ENABLE_ACTOR_PARSING=False`로 비활성)
+      * **기본 (옵션 없음):** USD customData의 `en` 필드를 프롬프트로 사용합니다 (LLM 불필요). ko→en 번역 스테이지는 제거됨 — USD가 `en` 필드를 동봉하는 것으로 계약 확정.
       * **Filtering (`--filter`):** 영어 description에서 배경/행동을 제거하고 시각 요소만 남깁니다.
       * 폴더 구조(`scene_n/objects` 또는 `scene_n/shot_n/objects`)나 루트 폴더 이름에 무관하게, USD reference 그래프와 `scene_*/shot_*` prim 마커를 기반으로 경로를 추출합니다.
   * **Script:** `previz_pipeline/usd_parse_and_augment.py`
@@ -83,7 +82,7 @@ cd /root/previs_proj
       * `usd_results.json` — 이번 run 입력 스냅샷
       * `results.csv` — TRELLIS 생성 결과 (prompt, seed, run_id)
       * `previews/scene_n/object_n/` — ply/mp4/jpg + `generation.json` (프롬프트 추적)
-      * 각 항목에는 `object_path`, `usd_file_path`, `description`(`{ko,en}`), `description_ko`, `description_en`, `translated_description`, `t2i_prompt` 등이 포함됩니다.
+      * 각 항목에는 `object_path`, `usd_file_path`, `description`(`{ko,en}`), `description_ko`, `description_en`, `t2i_prompt` 등이 포함됩니다.
 
 **USD object customData (bilingual 스키마)**
 
@@ -95,13 +94,12 @@ cd /root/previs_proj
 | `location`, `action` | `dictionary { ko, en }` | shot override 메타 |
 | `category`, `object_id` | `string` | 단일 언어 |
 
-**`--translate` 동작**
+**프롬프트 소스 동작**
 
 | 실행 | 소스 | LLM |
 |------|------|-----|
-| 기본 | USD `en` → `description_en` / `translated_description` | 없음 |
-| `--translate` | USD `ko` → LLM 번역 → `translated_description` | 1단계 |
-| `--filter` | 영어 프롬프트 증강 → `t2i_prompt` | 2단계 |
+| 기본 | USD `en` → `description_en` | 없음 |
+| `--filter` | `description_en` → 캡션 정제 → `t2i_prompt` | 필터 |
 
 **2. Stage 2: Asset Factory (TRELLIS)**
 
@@ -184,7 +182,7 @@ t2o_results/TRELLIS-text-base/20260624/
   * **Python 환경:** `pxr` (usd-core), `torch`, `trellis`/`trellis2`, `trimesh`, `ollama`, `imageio`, `Pillow` 라이브러리가 설치되어 있어야 합니다. Stage 3(GLB→USD) 변환은 `trimesh` + `pxr` 로만 동작합니다.
   * **외부 툴:**
       * ~~**usd\_from\_gltf**~~ — **더 이상 필요 없습니다.** GLB→USD 변환이 네이티브(`glb_to_usd_native.py`)로 대체되었습니다. 레거시 바이너리 빌드/설치 불필요.
-      * **Ollama:** `--translate` 또는 `--filter` 사용 시에만 필요합니다. 스크립트가 자동으로 `ollama serve`를 시작/종료합니다.
+      * **Ollama:** `--filter` 사용 시에만 필요합니다. 스크립트가 자동으로 `ollama serve`를 시작/종료합니다.
   * **TRELLIS 모델:** `run_usd_to_3D_object.sh` 기본값은 `microsoft/TRELLIS-text-base`입니다. HF 모델은 프로젝트 루트 `hf_models/`에 캐시되며, 로컬에 없으면 자동 다운로드됩니다.
 
 #### 🧠 모델 설정 (Model Configuration)
@@ -201,11 +199,11 @@ t2o_results/TRELLIS-text-base/20260624/
 
 > Stage 2를 스크립트 없이 직접 실행할 때(`json_parse_and_inference.py`) 기본 모델은 `microsoft/TRELLIS-text-xlarge`입니다. 쉘 스크립트와 동일하게 쓰려면 `--model_path microsoft/TRELLIS-text-base`를 명시하세요.
 
-**Ollama (번역/필터, `--translate` / `--filter` 시에만)**
+**Ollama (필터, `--filter` 시에만)**
 
 | 항목 | 설명 |
 |------|------|
-| 기본 모델 | `gemma3:4b` (`OLLAMA_MODEL`, `OLLAMA_FILTER_MODEL`) |
+| 기본 모델 | `gemma3:4b` (`OLLAMA_FILTER_MODEL`) |
 | 사전 설치 | `ollama pull gemma3:4b` (모델명 변경 시 해당 모델 pull) |
 | 원격 서버 | `OLLAMA_BASE_URL=http://host:11434` |
 
@@ -227,8 +225,7 @@ t2o_results/TRELLIS-text-base/20260624/
 **옵션:**
 
   * **`--model <model_path>`**: TRELLIS 모델 경로 또는 HF 모델명 (예: `microsoft/TRELLIS-text-large`).
-  * **`--translate`**: 1단계 LLM 번역 활성화 (USD `ko` → 영어). 미지정 시 USD `en` 직접 사용.
-  * **`--filter`**: 2단계 LLM 필터링/증강 활성화.
+  * **`--filter`**: LLM 필터링(캡션 정제) 활성화. 프롬프트 소스는 항상 USD `en` 필드.
   * **`-- <extra_args>`**: `--` 이후 인자는 TRELLIS 추론 스크립트로 전달됩니다 (예: `-- --max_items 5`).
 
 **주요 환경 변수:** (상세는 위 **모델 설정** 섹션 참고)
@@ -250,12 +247,12 @@ cd /root/previs_proj/t2o_pipeline
   /root/previs_proj/movie_usd/hidden_time/hidden_time.usda \
   /root/previs_proj/t2o_pipeline/t2o_results
 
-# 번역 + 필터링 활성화, 특정 모델 사용
-OLLAMA_MODEL=gemma3:12b \
+# 필터링 활성화, 특정 모델 사용
+OLLAMA_FILTER_MODEL=gemma3:12b \
   ./run_usd_to_3D_object.sh \
   /root/previs_proj/movie_usd/hidden_time/hidden_time.usda \
   /root/previs_proj/t2o_pipeline/t2o_results \
-  --model microsoft/TRELLIS-text-large --translate --filter
+  --model microsoft/TRELLIS-text-large --filter
 
 # 처리 항목 수 제한 (TRELLIS 인자 전달)
 ./run_usd_to_3D_object.sh \
@@ -269,8 +266,8 @@ OLLAMA_MODEL=gemma3:12b \
 ```bash
 # Stage 1: USD 파싱 및 증강 → usd_results.json (--type 기본: object)
 python3 previz_pipeline/usd_parse_and_augment.py scene.usda --output usd_results.json
-# (번역/필터 사용 시 — 여기서 --model은 Ollama 모델명)
-python3 previz_pipeline/usd_parse_and_augment.py scene.usda --output usd_results.json --translate --filter --model gemma3:4b
+# (필터 사용 시)
+python3 previz_pipeline/usd_parse_and_augment.py scene.usda --output usd_results.json --filter --filter-model gemma3:4b
 
 # Stage 2: TRELLIS 3D 생성 (glb는 원본 USD 옆 assets에 저장됨)
 # 쉘 스크립트와 동일한 모델을 쓰려면 --model_path를 명시 (--model_path 기본값은 text-xlarge)

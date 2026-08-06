@@ -75,7 +75,7 @@ T2I_GPU=1 ./object_generate.sh movie_usd/hidden_time/hidden_time.usda --no-filte
 |---|---|
 | `conda activate trellis2` 선(先)활성화 | 런처는 activate 안 함 |
 | 입력은 **루트 USD**(`hidden_time.usda`) | shot 경로(`.../shot_1/objects/object_1.usda`)를 직접 주면 meta-only override 라 `필수 정보 0개` 로 끝난다. 루트에서 시작해야 scene canonical 이 잡힌다 |
-| `--no-filter` (현재) | `--filter`/`--translate` 는 ollama 가 필요한데 **이 서버엔 아직 ollama 가 안 떠 있다**(§4). 안 붙이면 USD 의 en/description 을 직접 쓴다 |
+| `--no-filter` (현재) | `--filter` 는 ollama 가 필요한데 **이 서버엔 아직 ollama 가 안 떠 있다**(§4). 안 붙이면 USD 의 en/description 을 직접 쓴다 (`--translate` 는 제거됨 — USD 가 en 을 동봉) |
 | `T2I_GPU=1` | FLUX 를 별도 GPU(인덱스 1)에 올려 TRELLIS.2(인덱스 0)와 카드 분리. **4090(24GB): 필수** — TRELLIS.2 상주(~23GB)+FLUX(~23.4GB peak)가 한 카드를 공유하면 OOM(실측). A100(80GB): 공유해도 OOM 은 안 나지만 분리가 깔끔·빠름. ⚠️ TRELLIS.2 가 쓰는 인덱스 0 은 **주지 말 것**(같은 카드라 충돌) |
 
 ### 주요 환경변수 (전부 선택 — 기본값으로 동작)
@@ -150,9 +150,9 @@ def Xform "object_1" (
 
 ---
 
-## 4. ollama (`--filter`/`--translate`) — 셋업 완료 (2026-07-28)
+## 4. ollama (`--filter`) — 셋업 완료 (2026-07-28)
 
-`--filter`(프롬프트 증강)·`--translate`(ko→en 번역)는 ollama 를 쓴다. **호스트 `ollama` 컨테이너에
+`--filter`(캡션 정제)는 ollama 를 쓴다. (`--translate` 스테이지는 2026-08 제거 — USD 가 en 필드를 동봉.) **호스트 `ollama` 컨테이너에
 `gpt-oss:20b` 를 pull 해뒀다.** previs-prep 컨테이너에서는 **`http://172.17.0.1:11434`**(도커 브리지
 게이트웨이 → host published 포트)로 도달한다. ⚠️ 컨테이너 네트워크가 달라 `ollama` 호스트명은 안 되고
 `172.17.0.1` 이어야 한다.

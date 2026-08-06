@@ -6,12 +6,12 @@ Given an English description and a target type (object or actor), extract ONLY t
 
 ### Input fields
 
-* `translated_description` — the main description. Always present.
+* `description` — the main description (English). Always present.
 * `appearance` — OPTIONAL. Additional visual detail about the same entity (color, material,
   markings, shape). **Merge it into your single output caption.** It is written as scene
   description, so it often carries context you MUST strip (e.g. "held in hand", "worn by X",
   "thrown into the cockpit"). Keep only the physical features; apply every forbidden-word rule
-  below to it exactly as you do to `translated_description`.
+  below to it exactly as you do to `description`.
 * Produce ONE caption per entity that covers both fields. Never emit two captions.
 
 ## Rules:
@@ -137,7 +137,7 @@ Input:
     "target": "object",
     "name": "smartphone",
     "category": "electronic_device",
-    "translated_description": "A portable electronic device being used to take photos. The screen is bright.",
+    "description": "A portable electronic device being used to take photos. The screen is bright.",
     "appearance": "rectangular device held by a woman, screen displaying a photo of the sky"
   },
   {
@@ -145,12 +145,12 @@ Input:
     "target": "object",
     "name": "car",
     "category": "vehicle",
-    "translated_description": "A row of cars arranged on a boat. The interior is a standard passenger car layout, with visible windows and seats."
+    "description": "A row of cars arranged on a boat. The interior is a standard passenger car layout, with visible windows and seats."
   },
   {
     "actor_path": "scene_1/shot_2/actor_1",
     "target": "actor",
-    "translated_description": "A woman sitting in the backseat with long white hair looking out the window"
+    "description": "A woman sitting in the backseat with long white hair looking out the window"
   }
 ]
 

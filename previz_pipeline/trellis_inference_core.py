@@ -277,7 +277,6 @@ class TrellisInferenceCore:
             "prompt_used": prompt,
             "t2i_prompt": context.get("t2i_prompt"),
             "description_en": context.get("description_en"),
-            "translated_description": context.get("translated_description"),
             "seed": seed,
             "glb_path": glb_path,
             "preview_files": preview_files,
@@ -300,8 +299,8 @@ class TrellisInferenceCore:
         return f"{scene_name}_{shot_name}_{label_name}_{seed}"
 
     def _resolve_asset_label_name(self, item: Dict, fallback: str = 'item') -> str:
-        """출력 파일명에 사용할 라벨(translated_name 우선)을 결정합니다."""
-        for key in ('translated_name', 'name_en', 'category', 'target_type', 'object_name'):
+        """출력 파일명에 사용할 라벨(name_en 우선)을 결정합니다."""
+        for key in ('name_en', 'category', 'target_type', 'object_name'):
             value = item.get(key)
             if value and str(value).strip():
                 return self._sanitize_path_segment(str(value).strip(), fallback)
@@ -327,7 +326,7 @@ class TrellisInferenceCore:
                 - target_name
                 - target_type
                 - category
-                - translated_name
+                - name_en
             config: Generation configuration dict (same structure as YAML config).
             output_dir: Target directory for outputs in this run.
         """
@@ -352,13 +351,12 @@ class TrellisInferenceCore:
                 'target_name': record.get('target_name') or record.get('object_name'),
                 'target_type': record.get('target_type'),
                 'category': record.get('category'),
-                'translated_name': record.get('translated_name'),
+                'name_en': record.get('name_en'),
                 'usd_file_path': record.get('usd_file_path'),
                 'run_id': record.get('run_id'),
                 'object_path': record.get('object_path') or record.get('file_identifier'),
                 't2i_prompt': record.get('t2i_prompt'),
                 'description_en': record.get('description_en'),
-                'translated_description': record.get('translated_description'),
             })
 
         if not normalized_records:
@@ -421,7 +419,7 @@ class TrellisInferenceCore:
                         'shot': shot_name,
                         'target_dir_name': target_dir_name,
                         'target_type': target_type,
-                        'translated_name': item.get('translated_name'),
+                        'name_en': item.get('name_en'),
                         'category': item.get('category'),
                         'object_name': object_name,
                         'usd_file_path': item.get('usd_file_path'),
@@ -429,7 +427,6 @@ class TrellisInferenceCore:
                         'file_identifier': item.get('file_identifier'),
                         't2i_prompt': item.get('t2i_prompt'),
                         'description_en': item.get('description_en'),
-                        'translated_description': item.get('translated_description'),
                         'run_id': item.get('run_id') or self.run_id,
                     }
                 )
@@ -591,7 +588,7 @@ class TrellisInferenceCore:
         save_start = time.time()
         
         try:
-            # GLB/PLY 등: {scene}_{translated_name}_{seed} (shot 미지정 시 shot 생략)
+            # GLB/PLY 등: {scene}_{name_en}_{seed} (shot 미지정 시 shot 생략)
             asset_label_name = self._resolve_asset_label_name(context, context.get('target_type') or 'item')
             file_prefix = self._build_file_prefix(scene_name, shot_name, asset_label_name, seed)
             if 'glb' in formats:

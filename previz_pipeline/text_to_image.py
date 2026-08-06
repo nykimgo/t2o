@@ -1,7 +1,7 @@
 """Text→Image bridge for the TRELLIS.2 pipeline (Phase 2).
 
 TRELLIS.2 is image-conditioned only, so the t2o (text-to-object) flow needs a
-Text→Image stage between the (translated/filtered) prompt and TRELLIS.2.
+Text→Image stage between the assembled (optionally filtered) prompt and TRELLIS.2.
 This module wraps **FLUX.1-schnell** and produces a single clean, centered,
 white-background reference image suitable for image-to-3D.
 
@@ -120,7 +120,7 @@ class TextToImage:
         """Generate one reference image for ``prompt``.
 
         Args:
-            prompt: English object description (post translate/filter).
+            prompt: English object description (USD en, optionally filter-refined).
             seed: RNG seed (kept aligned with the TRELLIS.2 seed upstream).
             steps: FLUX inference steps (schnell: 4).
             guidance: guidance scale (schnell: 0.0, unused).

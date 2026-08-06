@@ -206,7 +206,7 @@ export TRELLIS_BASE_OUTPUT=<repo>/t2o_pipeline/t2o_results
 
 ### 5.4 기타 주의점
 
-- **`--translate` / `--filter` 는 ollama가 필요하다.** 기존 서버엔 ollama가 안 떠 있어서 안 썼다. 기본 실행은 USD `customData`의 `en` 필드를 프롬프트로 직접 쓴다. 새 서버에 ollama가 있으면 활성화해도 된다 (기본 모델 `gemma3:4b`).
+- **`--filter` 는 ollama가 필요하다.** (`--translate` 는 2026-08 제거됨 — USD 가 `en` 필드를 동봉하는 것으로 계약 확정.) 기본 실행은 USD `customData`의 `en` 필드를 프롬프트로 직접 쓴다. 새 서버에 ollama가 있으면 활성화해도 된다 (기본 모델 `gemma3:4b`).
 - **소요 시간**: 객체 1개당 TRELLIS.2 추론 ~36s + GLB export ~42s ≈ 3분. 첫 실행은 FLUX/파이프라인 로딩까지 더 걸린다.
 - **HDRI 렌더는 best-effort** — 실패해도 GLB 생성은 계속된다. HDRI는 `trellis2_src/assets/hdri/*.exr` (repo 포함, 기본 `forest.exr`).
 - **GLB는 PNG 텍스처로 export된다** (`extension_webp=False`). 번들된 `usd_from_gltf`가 `EXT_texture_webp`를 지원하지 않기 때문이다. 이 결정은 E2E에서 검증됐다 (§C.5) — **바꾸지 말 것.**

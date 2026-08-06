@@ -1,7 +1,8 @@
 """
 USD 파일 파싱 및 프롬프트 증강 통합 스크립트
 
-USD 파일에서 필요한 정보를 추출하고, 중간 저장 없이 바로 LLM으로 증강한 후 최종 JSON을 저장합니다.
+USD 파일에서 필요한 정보를 추출하고, (옵션) 필터 LLM으로 캡션을 정제한 후 최종 JSON을 저장합니다.
+프롬프트 언어는 USD customData 의 en 필드(description_en/name_en)를 직접 사용합니다.
 """
 
 import json
@@ -9,7 +10,7 @@ import os
 import re
 import sys
 import time
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any
 
 from bilingual import is_blank, pick_lang
 from t2i_prompt_builder import build_t2i_prompt
@@ -161,30 +162,9 @@ def _get_english_description(obj: Dict[str, Any]) -> str:
     return str(obj.get("description_en") or pick_lang(obj.get("description"), "en")).strip()
 
 
-def _get_korean_name(obj: Dict[str, Any]) -> str:
-    return str(obj.get("name_ko") or pick_lang(obj.get("name"), "ko")).strip()
-
-
 def _get_english_name(obj: Dict[str, str]) -> str:
-    """필터링/TRELLIS 입력용 영어 name (번역본 우선, 없으면 USD en)."""
-    translated = str(obj.get("translated_name", "")).strip()
-    if translated:
-        return translated
+    """필터링/TRELLIS 입력용 영어 name (USD en 필드)."""
     return str(obj.get("name_en") or pick_lang(obj.get("name"), "en")).strip()
-
-
-def _parse_translation_entry(entry: Any) -> Tuple[str, str]:
-    """
-    1단계 번역 LLM 응답 항목에서 translated_description, translated_name을 추출합니다.
-    """
-    if isinstance(entry, dict):
-        return (
-            str(entry.get("translated_description", "") or "").strip(),
-            str(entry.get("translated_name", "") or "").strip(),
-        )
-    if isinstance(entry, str):
-        return entry.strip(), ""
-    return "", ""
 
 
 def _convert_llm_result_keys(
@@ -412,83 +392,6 @@ def _parse_json_response(response_text: str) -> Dict[str, str]:
     raise ValueError(f"Could not parse JSON response: {response_text[:500]}...")
 
 
-def translate_descriptions_with_ollama(
-    parsed_objects: List[Dict[str, str]],
-    model_name: str = "gemma3:4b",
-    base_url: Optional[str] = None,
-    prompt_file: str = "step1_translate_prompt.txt"
-) -> Dict[str, Any]:
-    """
-    한글 description과 name을 영어로 번역합니다.
-    """
-    if not parsed_objects:
-        return {}
-    
-    objects_with_description = [
-        obj for obj in parsed_objects
-        if _get_korean_description(obj)
-    ]
-    
-    if not objects_with_description:
-        print("[WARNING] 번역할 description이 없습니다.")
-        return {}
-    
-    system_prompt = load_system_prompt(prompt_file)
-    objects_for_llm = []
-    for obj in objects_with_description:
-        llm_obj = {
-            "target": obj.get("target", ""),
-            "category": obj.get("category", ""),
-            "description": _get_korean_description(obj),
-            "object_path": obj.get("object_path", ""),
-            "actor_path": obj.get("actor_path", "")
-        }
-        name = _get_korean_name(obj)
-        if name:
-            llm_obj["name"] = name
-        objects_for_llm.append(llm_obj)
-    
-    input_json = json.dumps(objects_for_llm, ensure_ascii=False, indent=2)
-    translation_prompt = f"""{system_prompt}
-
-## Input JSON:
-{input_json}
-
-## Instructions:
-- Translate each "description" into natural English. Preserve every detail from the original.
-- If "name" is present and non-empty, translate it into a concise English noun (e.g., "핸드폰" -> "smartphone", "차량" -> "car", "갈매기" -> "seagull").
-- Use either "object_path" or "actor_path" (whichever is non-empty) as the key in your output JSON.
-- Return ONLY a JSON object where keys are these paths and values are objects:
-  {{"translated_description": "<English description>", "translated_name": "<English noun>"}}
-- If "name" is empty or absent in the input item, set "translated_name" to "".
-"""
-    
-    response_text = _generate_with_ollama(
-        prompt=translation_prompt,
-        model_name=model_name,
-        base_url=base_url,
-        num_predict=max(len(objects_for_llm) * 200, 1000),
-        operation_label="1단계 번역"
-    )
-    
-    print(f'[INFO][번역] RESPONSE TEXT: {response_text}\n\n')
-    
-    try:
-        result = _parse_json_response(response_text)
-        print(f"[DEBUG][번역] JSON 파싱 성공: {len(result)}개 항목")
-    except Exception as e:
-        print(f"[ERROR][번역] JSON 파싱 실패: {e}")
-        import traceback
-        traceback.print_exc()
-        return {}
-    
-    path_to_obj = _build_path_to_obj_map(objects_with_description)
-    converted_result = _convert_llm_result_keys(result, path_to_obj, stage_label="번역")
-    print(f"[DEBUG][번역] 변환 완료: {len(converted_result)}개")
-    
-    return converted_result
-
-
 def augment_batch_with_ollama(
     parsed_objects: List[Dict[str, str]],
     model_name: str = "gemma3:4b",
@@ -497,14 +400,14 @@ def augment_batch_with_ollama(
     retry_count: int = 0
 ) -> Dict[str, str]:
     """
-    번역된 description을 기반으로 프롬프트를 필터링합니다.
+    USD 영어 description을 기반으로 프롬프트를 필터링합니다.
     """
     if not parsed_objects:
         return {}
-    
+
     objects_with_description = [
         obj for obj in parsed_objects
-        if str(obj.get("translated_description", "")).strip()
+        if _get_english_description(obj)
     ]
     
     if not objects_with_description:
@@ -519,7 +422,7 @@ def augment_batch_with_ollama(
         llm_obj = {
             "target": obj.get("target", ""),
             "category": obj.get("category", ""),
-            "translated_description": obj.get("translated_description", ""),
+            "description": _get_english_description(obj),
             "object_path": obj.get("object_path", ""),
             "actor_path": obj.get("actor_path", "")
         }
@@ -698,27 +601,25 @@ def extract_essential_info(parsed_objects: List[Dict[str, str]]) -> List[Dict[st
 def parse_and_augment(
     usd_file_path: str,
     output_json_path: str,
-    model_name: str = "gemma3:4b",
-    filter_model_name: Optional[str] = None,
+    filter_model_name: str = "gemma3:4b",
     base_url: Optional[str] = None,
     parse_type: str = "object",
-    enable_translate: bool = False,
     enable_filter: bool = False,
-    translation_prompt_file: str = "step1_translate_prompt.txt",
     filter_prompt_file: str = "step2_filter_prompt.txt"
 ) -> None:
     """
-    USD 파일을 파싱하고, 바로 LLM으로 증강한 후 최종 JSON을 저장합니다.
-    
+    USD 파일을 파싱하고, (옵션) 필터 LLM으로 캡션을 정제한 후 최종 JSON을 저장합니다.
+
+    프롬프트 언어: USD customData 의 en 필드(description_en/name_en)를 직접 사용합니다.
+    (구 1단계 ko→en 번역 스테이지는 제거됨 — USD 가 en 을 동봉하는 것으로 계약 확정.)
+
     Args:
         usd_file_path: USD 파일 경로
         output_json_path: 출력 JSON 파일 경로
-        model_name: 1단계 번역용 Ollama 모델 이름 (기본값: "gemma3:4b")
-        filter_model_name: 2단계 필터링용 Ollama 모델 이름 (기본값: None, model_name 사용)
+        filter_model_name: 필터링(2단계)용 Ollama 모델 이름 (기본값: "gemma3:4b")
         base_url: Ollama 서버 URL (기본값: None, localhost:11434 사용)
         parse_type: 파싱할 타입 ("object", "actor", "both")
-        enable_translate: 1단계 번역 활성화 여부 (기본값: False)
-        enable_filter: 2단계 필터링 활성화 여부 (기본값: False)
+        enable_filter: 필터링 활성화 여부 (기본값: False)
     """
     if not USD_PARSER_AVAILABLE:
         raise ImportError("USD 파서를 사용할 수 없습니다. usd_parser 모듈을 확인하세요.")
@@ -780,51 +681,8 @@ def parse_and_augment(
         print(f"   파싱된 항목은 {len(parsed_objects)}개이지만, 필수 정보(description 등)가 없습니다.")
         return
     
-    # 3. 1단계 번역 (옵션)
-    if enable_translate:
-        translation_model = model_name
-        print(f"[INFO] 1단계 번역 시작 (모델: {translation_model})...")
-        _t0 = time.time()
-        translation_result = translate_descriptions_with_ollama(
-            essential_objects,
-            model_name=translation_model,
-            base_url=base_url,
-            prompt_file=translation_prompt_file
-        )
-        _stage_times["1단계 번역(LLM)"] = time.time() - _t0
-        print(f"[INFO] 1단계 번역 완료: {len(translation_result)}개")
-        print(f"[TIME] 1단계 번역(LLM): {_stage_times['1단계 번역(LLM)']:.1f}s")
-        
-        missing_translation = 0
-        for obj in essential_objects:
-            key = _determine_response_key(obj)
-            entry = translation_result.get(key, "") if key else ""
-            translated_text, translated_name = _parse_translation_entry(entry)
-            if translated_text:
-                obj["translated_description"] = translated_text
-            else:
-                obj["translated_description"] = ""
-                missing_translation += 1
-            obj["translated_name"] = translated_name
-        
-        if missing_translation:
-            print(f"[WARNING] 번역되지 않은 항목: {missing_translation}개")
-    else:
-        print(f"[INFO] 1단계 번역 비활성화됨 — USD en 필드를 translated_description으로 사용")
-        translation_model = None
-        for obj in essential_objects:
-            obj["translated_description"] = _get_english_description(obj)
-            obj["translated_name"] = _get_english_name(obj)
-    
-    # 1단계 모델 언로드 여부 결정 (2단계 모델과 다르면 언로드)
-    filter_model = filter_model_name if filter_model_name is not None else model_name
-    models_are_different = enable_translate and enable_filter and translation_model != filter_model
-    
-    if models_are_different:
-        print(f"[INFO] 1단계와 2단계 모델이 다르므로 1단계 모델 언로드 중...")
-        _unload_ollama_model(translation_model, base_url)
-    
-    # 4. LLM 필터링 (옵션)
+    # 3. LLM 필터링 (옵션) — 프롬프트 언어는 USD en 필드 직접 사용
+    filter_model = filter_model_name
     if enable_filter:
         print(f"[INFO] 2단계 필터링 시작 (모델: {filter_model})...")
         _t0 = time.time()
@@ -847,16 +705,11 @@ def parse_and_augment(
     else:
         print(f"[INFO] 2단계 필터링 비활성화됨")
         augmented_dict = {}
-        
-        # 필터링이 비활성화되고 번역이 활성화된 경우 1단계 모델 언로드
-        if enable_translate:
-            print(f"[INFO] 1단계 모델 언로드 중...")
-            _unload_ollama_model(translation_model, base_url)
-    
+
     # 5. 최종 JSON 생성 (필수 정보 + t2i_prompt)
     final_results = []
     t2i_prompt_count = 0
-    translated_count = 0
+    usd_en_count = 0
     description_only_count = 0
     
     for essential in essential_objects:
@@ -888,12 +741,11 @@ def parse_and_augment(
         # 이 항목의 t2i_prompt 가 2단계 필터 캡션에서 나왔는지 (아래 {appearance} 슬롯 결정에 사용)
         _from_filter = bool(t2i_prompt)
 
-        # 프롬프트 우선순위: t2i_prompt -> translated_description -> description
-        # t2i_prompt가 비어있으면 translated_description 사용
+        # 프롬프트 우선순위: 필터 캡션 -> USD en description
         if not t2i_prompt:
-            t2i_prompt = essential.get("translated_description", "")
+            t2i_prompt = _get_english_description(essential)
             if t2i_prompt:
-                translated_count += 1
+                usd_en_count += 1
             else:
                 description_only_count += 1
         else:
@@ -910,8 +762,6 @@ def parse_and_augment(
             final_item["object_name"] = essential.get("object_name", "")
             final_item["object_id"] = essential.get("object_id", "")
             _copy_bilingual_fields(essential, final_item, "name")
-            if essential.get("translated_name"):
-                final_item["translated_name"] = essential.get("translated_name", "")
         elif ENABLE_ACTOR_PARSING and target == "actor":
             final_item["actor_path"] = essential.get("actor_path", "")
             final_item["actor_name"] = essential.get("actor_name", "")
@@ -927,10 +777,9 @@ def parse_and_augment(
 
         final_item["category"] = essential.get("category", "")
         _copy_bilingual_fields(essential, final_item, "description")
-        final_item["translated_description"] = essential.get("translated_description", "")
 
         # §9 확정 시스템 프롬프트 적용 (category 라우팅: 무생물/생명체). prompt_lab
-        # EXPERIMENT_LOG.md §9. 필터 캡션/번역(t2i_prompt)을 base_description 슬롯으로,
+        # EXPERIMENT_LOG.md §9. 필터 캡션/USD en(t2i_prompt)을 base_description 슬롯으로,
         # name(en)을 object 로 조립. 생명체는 body-plan 스캐폴딩(object만), 무생물은 격리문구 부착.
         _obj_en = (_get_english_name(essential) if target == "object"
                    else str(essential.get("actor_name", "")).strip())
@@ -998,7 +847,7 @@ def parse_and_augment(
         "shot_meta_only_count": len(shot_objects),
         "with_description": with_description_count,
         "t2i_prompt_count": t2i_prompt_count,
-        "translated_count": translated_count,
+        "usd_en_count": usd_en_count,
         "description_only_count": description_only_count,
         "skipped_shot_override_paths": [
             o.get("object_path", "") for o in shot_objects if o.get("object_path")
@@ -1018,9 +867,9 @@ def parse_and_augment(
     print(f"[INFO] 통계:")
     print(f"  - USD 파싱: 총 {len(parsed_objects)}개 (object: {parsed_objects_count}개, actor: {parsed_actors_count}개)")
     print(f"  - description 있음: {with_description_count}개")
-    print(f"  - t2i_prompt 사용: {t2i_prompt_count}개")
-    print(f"  - translated_description 사용: {translated_count}개")
-    print(f"  - description만 사용: {description_only_count}개")
+    print(f"  - 필터 캡션 사용: {t2i_prompt_count}개")
+    print(f"  - USD en description 사용: {usd_en_count}개")
+    print(f"  - 영어 description 없음: {description_only_count}개")
     print(f"  - shot override(meta-only, TRELLIS/merge 제외): {len(shot_objects)}개")
     print(f"[INFO] 총 {len(final_results)}개 항목 저장됨")
 
@@ -1039,7 +888,7 @@ def parse_and_augment(
               f"{with_description_count - t2i_prompt_count}개 "
               f"(적용 {t2i_prompt_count}/{with_description_count}) — 해당 항목은 원본 description 사용")
 
-    # 단계별 소요 시간 요약 (1단계 = USD 파싱 + LLM 번역/필터)
+    # 단계별 소요 시간 요약 (1단계 = USD 파싱 + LLM 필터)
     _total = time.time() - _t_pipeline_start
     print(f"[TIME] ===== 1단계(stage1) 소요 시간 =====")
     for _name, _sec in _stage_times.items():
@@ -1058,17 +907,14 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 예시:
-  # USD 파일 파싱 및 증강 (object와 actor 모두)
+  # 기본 실행 (USD en 필드 직접 사용, LLM 없음)
   python usd_parse_and_augment.py scene.usd --output results.json
-  
-  # object만 파싱 및 증강
+
+  # object만 파싱
   python usd_parse_and_augment.py scene.usd --output objects.json --type object
-  
-  # actor만 파싱 및 증강
-  python usd_parse_and_augment.py scene.usd --output actors.json --type actor
-  
-  # 모델 지정
-  python usd_parse_and_augment.py scene.usd --output results.json --model gemma3:4b
+
+  # 필터링 활성화 (캡션 정제 LLM)
+  python usd_parse_and_augment.py scene.usd --output results.json --filter --filter-model gemma3:4b
         """
     )
     parser.add_argument(
@@ -1089,14 +935,9 @@ if __name__ == "__main__":
         help="파싱할 타입: object (객체만, 기본값), actor/both (ENABLE_ACTOR_PARSING=True 필요)"
     )
     parser.add_argument(
-        "-m", "--model",
-        default="gemma3:4b",
-        help="1단계 번역용 Ollama 모델 이름 (기본값: gemma3:4b)"
-    )
-    parser.add_argument(
         "--filter-model",
-        default=None,
-        help="2단계 필터링용 Ollama 모델 이름 (기본값: --model과 동일)"
+        default="gemma3:4b",
+        help="필터링용 Ollama 모델 이름 (기본값: gemma3:4b)"
     )
     parser.add_argument(
         "--base-url",
@@ -1104,27 +945,20 @@ if __name__ == "__main__":
         help="Ollama 서버 URL (기본값: http://localhost:11434)"
     )
     parser.add_argument(
-        "--translate",
-        action="store_true",
-        help="1단계 번역 활성화 (한국어 → 영어 번역)"
-    )
-    parser.add_argument(
         "--filter",
         action="store_true",
-        help="2단계 필터링 활성화 (프롬프트 증강)"
+        help="필터링 활성화 (캡션 정제 LLM)"
     )
-    
+
     args = parser.parse_args()
-    
+
     try:
         parse_and_augment(
             args.usd_file,
             args.output,
-            model_name=args.model,
             filter_model_name=args.filter_model,
             base_url=args.base_url,
             parse_type=args.type,
-            enable_translate=args.translate,
             enable_filter=args.filter
         )
         print("\n✅ 완료!")

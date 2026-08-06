@@ -164,12 +164,10 @@ def load_augmented_records(
             skipped["shot_override_meta_only"].append(item_path)
             continue
 
-        # 프롬프트 우선순위: t2i_prompt -> translated_description -> description_en -> description(en)
+        # 프롬프트 우선순위: t2i_prompt -> description_en -> description(en)
         prompt_text: Optional[str] = None
         if prefer_t2i_prompt:
             prompt_text = item.get('t2i_prompt')
-        if not prompt_text:
-            prompt_text = item.get('translated_description')
         if not prompt_text:
             prompt_text = item.get('description_en')
         if not prompt_text and allow_original_fallback:
@@ -193,9 +191,8 @@ def load_augmented_records(
         scene, shot = _extract_scene_shot(file_identifier)
         target_type = item.get('target') or ('object' if item.get('object_path') else 'actor')
         category = item.get('category') or target_type
-        translated_name = (
-            item.get('translated_name')
-            or item.get('name_en')
+        name_en = (
+            item.get('name_en')
             or pick_lang(item.get('name'), 'en')
             or ''
         )
@@ -214,10 +211,9 @@ def load_augmented_records(
             'target_name': target_name,
             'target_type': target_type,
             'category': category,
-            'translated_name': translated_name,
+            'name_en': name_en,
             't2i_prompt': item.get('t2i_prompt'),
             'description_en': item.get('description_en'),
-            'translated_description': item.get('translated_description'),
             'run_id': run_id,
             'usd_file_path': usd_file_path,
             'usd_relative_path': item.get('usd_relative_path')
