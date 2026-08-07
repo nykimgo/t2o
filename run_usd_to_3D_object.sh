@@ -8,14 +8,14 @@ usage() {
 Usage: run_usd_to_3D_object.sh <usd_file> <output_dir> [--model <trellis_model>] [--filter] [-- <extra_trellis_args>]
 
 Arguments:
-  --model <model_path>   TRELLIS 모델 경로 또는 HF 모델명 (예: microsoft/TRELLIS-text-large)
+  --model <model_path>   TRELLIS.2 모델 경로 또는 HF 모델명 (기본: t2o_pipeline/hf_models/TRELLIS.2-4B)
   --filter               필터링 활성화 (캡션 정제 LLM)
 
 Environment variables:
   OLLAMA_FILTER_MODEL    필터링용 Ollama 모델명 (기본: gemma3:4b)
   OLLAMA_BASE_URL        Ollama 서버 URL (기본: unset)
   PARSE_TYPE             usd_parse_and_augment 파싱 타입 (object|actor|both, 기본: object)
-  TRELLIS_MODEL_PATH     TRELLIS 모델 경로 또는 HF 모델명 (기본: microsoft/TRELLIS-text-base)
+  TRELLIS_MODEL_PATH     TRELLIS.2 모델 경로 또는 HF 모델명 (기본: hf_models/TRELLIS.2-4B 로컬)
   TRELLIS_BASE_OUTPUT    TrellisInferenceCore base_output (기본: 위 OUTPUT_DIR 인자)
   TRELLIS_CONFIG         TRELLIS YAML 설정 경로 (미지정 시 기본 설정 사용)
 
@@ -31,16 +31,15 @@ JSON 경로는 자동 생성됩니다: {output_dir}/{model_name}/{YYYYMMDD}/run_
   # 필터링 활성화
   ./run_usd_to_3D_object.sh scene.usda /mnt/output --filter
 
-  # 환경변수로 모델 지정
+  # 환경변수로 필터 모델 지정
   OLLAMA_FILTER_MODEL=gemma3:12b \
-    TRELLIS_MODEL_PATH=microsoft/TRELLIS-text-large \
     ./run_usd_to_3D_object.sh scene.usda /mnt/output --filter
 
-  # TRELLIS 모델만 인자로 지정
-  ./run_usd_to_3D_object.sh scene.usda /mnt/output --model microsoft/TRELLIS-text-large
+  # TRELLIS.2 모델 경로 지정
+  ./run_usd_to_3D_object.sh scene.usda /mnt/output --model /path/to/TRELLIS.2-4B
 
   # 추가 인자 전달
-  ./run_usd_to_3D_object.sh scene.usda /mnt/output --model microsoft/TRELLIS-text-large -- --max_items 5
+  ./run_usd_to_3D_object.sh scene.usda /mnt/output -- --max_items 5
 EOF
 }
 
@@ -86,7 +85,8 @@ done
 OLLAMA_FILTER_MODEL="${OLLAMA_FILTER_MODEL:-gemma3:4b}"
 PARSE_TYPE="${PARSE_TYPE:-object}"
 # --model 인자 > 환경변수 > 기본값 순으로 TRELLIS 모델을 확정합니다.
-TRELLIS_MODEL_PATH="${TRELLIS_MODEL_ARG:-${TRELLIS_MODEL_PATH:-microsoft/TRELLIS-text-base}}"
+# 기본 모델 = 로컬 TRELLIS.2-4B (v2 image-to-3D 백엔드가 기본이므로 v1 텍스트 모델명을 기본값으로 두지 않는다)
+TRELLIS_MODEL_PATH="${TRELLIS_MODEL_ARG:-${TRELLIS_MODEL_PATH:-${SCRIPT_DIR}/hf_models/TRELLIS.2-4B}}"
 
 # TRELLIS_EXTRA_ARGS의 --model_path도 반영하되, OUTPUT_JSON과 2단계가 동일 모델을 쓰도록
 # 여기서 한 번만 resolve하고 extra args에서는 제거합니다. (--model 미지정 시에만 extra가 override)
@@ -184,7 +184,7 @@ cleanup() {
 # 종료 시 정리 함수 호출
 trap cleanup EXIT INT TERM
 
-# 모델명에서 마지막 부분만 추출 (microsoft/TRELLIS-text-xlarge -> TRELLIS-text-xlarge)
+# 모델명에서 마지막 부분만 추출 (예: .../hf_models/TRELLIS.2-4B -> TRELLIS.2-4B)
 MODEL_NAME=$(basename "${TRELLIS_MODEL_PATH}")
 CURRENT_DATE=$(date +%Y%m%d)
 CURRENT_TIME=$(date +%H%M%S)

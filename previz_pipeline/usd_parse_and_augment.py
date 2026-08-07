@@ -41,7 +41,7 @@ if not OLLAMA_AVAILABLE and not REQUESTS_AVAILABLE:
     print("⚠️ Ollama를 사용하려면 'ollama' 또는 'requests' 패키지가 필요합니다.")
 
 
-def load_system_prompt(prompt_file: str = "/path/to/system_prompt") -> str:
+def load_system_prompt(prompt_file: str = "step2_filter_prompt.txt") -> str:
     """
     시스템 프롬프트 파일을 로드합니다.
     
@@ -110,30 +110,6 @@ def _canonical_object_path(object_path: str) -> str:
     parts = [p for p in object_path.replace("\\", "/").split("/") if p]
     filtered = [p for p in parts if not re.match(r"^shot_\w+$", p)]
     return "/".join(filtered) if filtered else object_path
-
-
-def _log_skip_summary(stage: str, skipped: Dict[str, List[str]]) -> None:
-    """건너뛴 항목을 사유별로 출력합니다."""
-    total = sum(len(paths) for paths in skipped.values())
-    if not total:
-        return
-    print(f"[INFO] {stage} 건너뜀: {total}개")
-    reason_labels = {
-        "shot_override_meta_only": "shot override (scene canonical과 중복, geometry 상속)",
-        "no_prompt": "TRELLIS 프롬프트 없음",
-        "target_filter": "타겟 필터 불일치",
-        "no_path": "object_path/actor_path 없음",
-        "no_object_name": "object_name 추출 실패",
-        "no_usd": "원본 USD 파일 없음",
-        "no_scene_canonical": "shot 경로이나 scene canonical USD 없음",
-        "no_glb_dir": "GLB 디렉토리 없음",
-        "no_glb": "GLB 파일 없음 (3D 생성 실패 또는 미실행)",
-    }
-    for reason, paths in skipped.items():
-        label = reason_labels.get(reason, reason)
-        print(f"  - {label}: {len(paths)}개")
-        for path in paths:
-            print(f"      · {path}")
 
 
 def _copy_bilingual_fields(source: Dict[str, Any], target: Dict[str, Any], field_name: str) -> None:
@@ -397,10 +373,14 @@ def augment_batch_with_ollama(
     model_name: str = "gemma3:4b",
     system_prompt_file: str = "step2_filter_prompt.txt",
     base_url: Optional[str] = None,
-    retry_count: int = 0
+    retry_count: int = 0,
+    debug_dump_dir: Optional[str] = None
 ) -> Dict[str, str]:
     """
     USD 영어 description을 기반으로 프롬프트를 필터링합니다.
+
+    debug_dump_dir 가 주어지면 JSON 파싱 실패 시 raw 응답 전문을 그 디렉토리에
+    filter_response_failed[_retryN].txt 로 남긴다 (터미널은 조용히 유지).
     """
     if not parsed_objects:
         return {}
@@ -454,7 +434,10 @@ def augment_batch_with_ollama(
         operation_label="2단계 필터링"
     )
     
-    print(f'[INFO][필터링] RESPONSE TEXT: {response_text}\n\n')
+    # LLM raw 응답 전문은 FILTER_DEBUG=1 일 때만 터미널에 출력한다.
+    # (배치가 크면 수천 자라 로그를 뒤덮는다. 평시엔 파싱 결과/통계 로그로 충분.)
+    if os.environ.get("FILTER_DEBUG"):
+        print(f'[DEBUG][필터링] RESPONSE TEXT(전문): {response_text}\n\n')
     
     try:
         result = _parse_json_response(response_text)
@@ -467,6 +450,17 @@ def augment_batch_with_ollama(
         print(f"[ERROR][필터링] JSON 파싱 실패: {e}")
         import traceback
         traceback.print_exc()
+        # 실패 원인 분석용으로 raw 응답 전문을 run 디렉토리에 남긴다.
+        # (평시 터미널엔 raw 를 안 찍으므로, 이 파일이 없으면 원문을 볼 방법이 없다.)
+        if debug_dump_dir:
+            try:
+                _suffix = f"_retry{retry_count}" if retry_count else ""
+                _dump_path = os.path.join(debug_dump_dir, f"filter_response_failed{_suffix}.txt")
+                with open(_dump_path, "w", encoding="utf-8") as _f:
+                    _f.write(response_text)
+                print(f"[INFO][필터링] raw 응답 전문 저장: {_dump_path}")
+            except OSError as _dump_err:
+                print(f"[WARNING][필터링] raw 응답 저장 실패: {_dump_err}")
         print("")
         print("=" * 72)
         print("⚠️  [필터링 실패] 2단계 필터가 적용되지 않았습니다 "
@@ -493,7 +487,8 @@ def augment_batch_with_ollama(
             model_name=model_name,
             system_prompt_file=system_prompt_file,
             base_url=base_url,
-            retry_count=retry_count + 1
+            retry_count=retry_count + 1,
+            debug_dump_dir=debug_dump_dir
         )
         result.update(retry_result)
         print(f"[INFO][필터링] 재시도 완료: 추가로 {len(retry_result)}개 항목 획득")
@@ -690,7 +685,8 @@ def parse_and_augment(
             essential_objects,
             model_name=filter_model,
             system_prompt_file=filter_prompt_file,
-            base_url=base_url
+            base_url=base_url,
+            debug_dump_dir=os.path.dirname(os.path.abspath(output_json_path))
         )
         _stage_times["프롬프트 최적화(2단계 필터, LLM)"] = time.time() - _t0
         print(f"[INFO] LLM 증강 완료: {len(augmented_dict)}개")

@@ -6,8 +6,10 @@ Two templates, routed by category (생명체는 내부에서 형태 3분기):
      "{base_description}, {appearance}, {object}, single centered object,
       neutral background, full object visible in frame, unoccluded"
 
-  ② 생명체 (creature) — body-plan 분류 후 고정 스캐폴딩 verbatim 삽입 (필드는 object만):
-     "{object}, <biped|quadruped|bird 스캐폴딩>"
+  ② 생명체 (creature) — body-plan 분류 후 고정 스캐폴딩 verbatim 삽입:
+     "{object}, <biped|quadruped|bird|insect 스캐폴딩>, {base_description}"
+     ⚠️ §9 원안은 "필드는 object만"이나, 정체성/외형 정보 보존을 위해 base_description 을
+     덧붙이는 것으로 운용 중 — 동작어 충돌 여부는 리깅 실험에서 최종 판정 예정(§9 후속).
 
 Body-plan 분류는 **LLM-free**다. Tripo/UniRig 의 rig-type taxonomy(biped/quadruped/bird/…)를
 참고하되, 저쪽은 3D 메시 지오메트리로 판정한다(post-mesh). 우리는 메시가 없는 text→image 단계라

@@ -9,11 +9,14 @@ USD 파일에서 객체(object) 정보를 추출하여 JSON 형식으로 반환�
 ENABLE_ACTOR_PARSING = False
 
 import json
+import logging
 import os
 import re
 from typing import Any, List, Optional, Dict
 
 from bilingual import coerce_bilingual, flatten_bilingual_fields, is_blank
+# rig_type 정규화/enum 은 t2i_prompt_builder 가 단일 소스다 — 파서는 파싱만 하고 값 해석은 위임.
+from t2i_prompt_builder import normalize_rig_type as _normalize_rig_type
 
 # USD Python 바인딩 찾기 및 로드
 USD_AVAILABLE = False
@@ -135,18 +138,7 @@ _DESCRIPTION_NOISE_FIELDS = ("userDocBrief",)
 #    object xform > etc > rig_type 이다(docs/CONTEXT.md §4). 최종 합의 후 갱신한다.
 #    _resolve_rig_type() 이 세 인코딩을 모두 읽으므로 어느 쪽이든 동작한다.
 # `string rig_type` = biped|quadruped|bird|insect|static object 로 들어온다.
-# (구 `etc.rig_type` 중첩 dict 형태도 계속 읽는다.)
-_VALID_RIG_TYPES = {"biped", "quadruped", "bird", "insect", "static_object"}
-
-
-def _normalize_rig_type(value) -> str:
-    """rig_type 값 정규화: 'static object'/'Static-Object' → 'static_object'. 미지값은 ''."""
-    if not value:
-        return ""
-    v = "_".join(str(value).strip().lower().replace("-", "_").replace(" ", "_").split("_"))
-    if v in {"static", "staticobject", "inanimate", "prop", "object"}:
-        v = "static_object"
-    return v if v in _VALID_RIG_TYPES else ""
+# (구 `etc.rig_type` 중첩 dict 형태도 계속 읽는다. 정규화는 t2i_prompt_builder.normalize_rig_type.)
 
 
 def _resolve_rig_type(custom_data: Dict, prim=None) -> str:
@@ -634,7 +626,7 @@ def parse_usd_file_with_api(
                                 if path_tuple not in paths:
                                     paths.append(path_tuple)
         except Exception as e:
-            print(f"[DEBUG USD] PrimStack에서 reference 읽기 실패: {e}")
+            logging.debug(f"PrimStack에서 reference 읽기 실패: {e}")
         
         return paths
     
@@ -645,37 +637,37 @@ def parse_usd_file_with_api(
         for prim in stage.Traverse():
             if prim.GetName() == "objects":
                 objects_prims.append(prim)
-                print(f"[DEBUG USD] objects Xform 발견: {prim.GetPath()}, base_path={base_path}")
+                logging.debug(f"objects Xform 발견: {prim.GetPath()}, base_path={base_path}")
     
     if objects_prims:
         # 모든 "objects" Xform 처리
         for objects_prim in objects_prims:
             # "objects" Xform 안의 자식 prim들 확인
-            print(f"[DEBUG USD] objects Xform의 자식 prim 수: {len(list(objects_prim.GetChildren()))}")
+            logging.debug(f"objects Xform의 자식 prim 수: {len(list(objects_prim.GetChildren()))}")
             for child_prim in objects_prim.GetChildren():
                 child_name = child_prim.GetName()
-                print(f"[DEBUG USD] 자식 prim: {child_name}, 경로: {child_prim.GetPath()}")
+                logging.debug(f"자식 prim: {child_name}, 경로: {child_prim.GetPath()}")
                 # object_1, object_2 등 object로 시작하는 prim만 처리
                 if not child_name.startswith("object_"):
-                    print(f"[DEBUG USD] '{child_name}'는 object_로 시작하지 않아서 건너뜀")
+                    logging.debug(f"'{child_name}'는 object_로 시작하지 않아서 건너뜀")
                     continue
                 
                 # object의 reference 경로 추출
                 child_paths = extract_reference_paths(child_prim)
-                print(f"[DEBUG USD] '{child_name}'의 reference 경로: {child_paths}")
+                logging.debug(f"'{child_name}'의 reference 경로: {child_paths}")
                 if not child_paths:
-                    print(f"[DEBUG USD] '{child_name}'의 reference 경로를 찾을 수 없음")
+                    logging.debug(f"'{child_name}'의 reference 경로를 찾을 수 없음")
                     continue
                 
                 # base_path 구성: prim 경로의 scene_*/shot_* 마커 기반(폴더 구조 무관)
                 prim_path = str(child_prim.GetPath())
                 next_base = _derive_next_base(prim_path, base_path, child_name)
                 
-                print(f"[DEBUG USD] '{child_name}'의 next_base: {next_base}")
+                logging.debug(f"'{child_name}'의 next_base: {next_base}")
                 
                 # 각 reference된 USD 파일로 재귀적으로 들어가기
                 for relative_path, child_path in child_paths:
-                    print(f"[DEBUG USD] '{child_name}'의 USD 파일로 재귀: {child_path} (상대경로: {relative_path})")
+                    logging.debug(f"'{child_name}'의 USD 파일로 재귀: {child_path} (상대경로: {relative_path})")
                     # 재귀 호출 결과에 상대 경로 정보 전달
                     child_results = parse_usd_file_with_api(
                         child_path,
@@ -699,36 +691,36 @@ def parse_usd_file_with_api(
         for prim in stage.Traverse():
             if prim.GetName() == "actors":
                 actors_prims.append(prim)
-                print(f"[DEBUG USD] actors Xform 발견: {prim.GetPath()}, base_path={base_path}")
+                logging.debug(f"actors Xform 발견: {prim.GetPath()}, base_path={base_path}")
     
     if ENABLE_ACTOR_PARSING and actors_prims:
         for actors_prim in actors_prims:
             # "actors" Xform 안의 자식 prim들 확인
-            print(f"[DEBUG USD] actors Xform의 자식 prim 수: {len(list(actors_prim.GetChildren()))}")
+            logging.debug(f"actors Xform의 자식 prim 수: {len(list(actors_prim.GetChildren()))}")
             for child_prim in actors_prim.GetChildren():
                 child_name = child_prim.GetName()
-                print(f"[DEBUG USD] 자식 prim: {child_name}, 경로: {child_prim.GetPath()}")
+                logging.debug(f"자식 prim: {child_name}, 경로: {child_prim.GetPath()}")
                 # actor_1, actor_2 등 actor로 시작하는 prim만 처리
                 if not child_name.startswith("actor_"):
-                    print(f"[DEBUG USD] '{child_name}'는 actor_로 시작하지 않아서 건너뜀")
+                    logging.debug(f"'{child_name}'는 actor_로 시작하지 않아서 건너뜀")
                     continue
                 
                 # actor의 reference 경로 추출
                 child_paths = extract_reference_paths(child_prim)
-                print(f"[DEBUG USD] '{child_name}'의 reference 경로: {child_paths}")
+                logging.debug(f"'{child_name}'의 reference 경로: {child_paths}")
                 if not child_paths:
-                    print(f"[DEBUG USD] '{child_name}'의 reference 경로를 찾을 수 없음")
+                    logging.debug(f"'{child_name}'의 reference 경로를 찾을 수 없음")
                     continue
                 
                 # base_path 구성: prim 경로의 scene_*/shot_* 마커 기반(폴더 구조 무관)
                 prim_path = str(child_prim.GetPath())
                 next_base = _derive_next_base(prim_path, base_path, child_name)
                 
-                print(f"[DEBUG USD] '{child_name}'의 next_base: {next_base}")
+                logging.debug(f"'{child_name}'의 next_base: {next_base}")
                 
                 # 각 reference된 USD 파일로 재귀적으로 들어가기
                 for relative_path, child_path in child_paths:
-                    print(f"[DEBUG USD] '{child_name}'의 USD 파일로 재귀: {child_path} (상대경로: {relative_path})")
+                    logging.debug(f"'{child_name}'의 USD 파일로 재귀: {child_path} (상대경로: {relative_path})")
                     # 재귀 호출 결과에 상대 경로 정보 전달
                     child_results = parse_usd_file_with_api(
                         child_path,

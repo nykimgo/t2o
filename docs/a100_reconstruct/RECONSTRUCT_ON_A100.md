@@ -58,7 +58,7 @@ bash fix_configs.sh /root/previs_proj    # ← A100 실제 repo 루트로 인자
 - [ ] `ollama list` 에 gpt-oss:20b
 - [ ] `PROMPT_LAB_PYTHON` 지정 or `.venv` 재생성
 - [ ] `grep -rn /home/sr configs/` 결과 없음(경로 치환 완료)
-- [ ] FLUX/TRELLIS.2 가중치 HF 재다운(게이트 승인 `raengs`) — `../../NEW_SERVER_SETUP.md` §4
+- [ ] FLUX/TRELLIS.2 가중치 HF 재다운(게이트 승인 `raengs`) — `../../TRELLIS2_MIGRATION.md` 게이트 레포 절 참고
 
 ---
 

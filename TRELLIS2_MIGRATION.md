@@ -181,7 +181,7 @@ huggingface-cli download microsoft/TRELLIS.2-4B --local-dir hf_models/TRELLIS.2-
 2. 참조 이미지 장수(1장 고정 vs N장 생성 후 선별)
 3. ~~TRELLIS.2 소스 관리 방식~~ → **`.gitignore` + SHA 고정 별도 clone 확정** (2026-07-21).
    `trellis2_src/`(6.5GB)는 repo에 포함하지 않는다. 재현 시 SHA `75fbf0183001ed9876c8dbb35de6b68552ee08bd`로
-   `git clone --recursive` 후 checkout. 절차는 `NEW_SERVER_SETUP.md` §3.1 참조.
+   `git clone --recursive` 후 checkout. 절차는 `.gitignore` 의 trellis2_src 주석 참조.
 4. 렌더 산출물 범위: PBR 프리뷰 mp4/썸네일을 어디까지 유지할지
 
 ---
@@ -335,4 +335,4 @@ TRELLIS.2-4B `pipeline.json`이 요구하는 게이트 HF 레포:
 기존 서버의 conda env는 이미 검증 완료(§C.1, §C.5)이므로 **env 바이너리는 되돌리지 않는다.**
 회수 대상은 **코드·문서·실행결과(git)뿐.**
 
-상세 절차는 **`NEW_SERVER_SETUP.md`** 참조 (환경 구축 함정 5개, 게이트 레포, 실행 인자, 미검증 지점).
+상세 절차는 **`ENV_REBUILD_GUIDE.md`** 참조. (구 `NEW_SERVER_SETUP.md` 는 A100 구서버 기준이라 2026-08-07 삭제됨.)

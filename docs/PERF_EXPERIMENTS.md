@@ -12,6 +12,11 @@
 
 **총 779.0s (13분)**
 
+> ⚠️ **이 표는 실험 A 적용 전(2026-08-05) 값이다.** 당시 기본 formats 가 `glb mp4 jpg` 였으므로
+> `render 122.5s` 가 포함돼 있다. A 적용 후 기본 실행(`formats=glb`)에서는 **이 122.5s 가 사라진다**
+> → 같은 조건이면 **약 656s** 가 새 기준선이다(미실측 추정, 렌더분만 차감).
+> 이후 회차와 비교할 때 formats 를 맞추거나 `render_time` 을 제외하고 볼 것.
+
 | 단계 | 시간 | 비중 |
 |---|---:|---:|
 | ① USD 파싱 | 0.9s | 0.1% |
@@ -102,7 +107,7 @@ EOF
 
 ```bash
 cd /home/sr/previs_proj
-RUNTAG=A_before
+RUNTAG=C_250k
 rm -rf tmp/htest/scene_1/objects/assets
 T2I_GPU=1 stdbuf -oL -eL ./object_generate.sh tmp/htest/hidden_time.usda --no-filter \
   -- --seed 20260805 2>&1 \
@@ -156,14 +161,30 @@ grep -E "1/3|2/3|3/3|Loading TRELLIS|전체 파이프라인 완료" tmp/perf/$RU
 
 ### 1-6. 실험 순서 규칙
 
-- **A 와 C 를 동시에 바꾸지 말 것.** A → (판정) → C 순서로 진행한다.
-- C 의 품질 평가는 프리뷰가 필요하므로 `formats` 에 `mp4`/`jpg` 를 유지한다.
-  (A 패치 후에는 formats 로 렌더가 제어되므로, C 실험 시엔 프리뷰를 켜야 한다.)
+- ~~**A 와 C 를 동시에 바꾸지 말 것.**~~ → **A 는 2026-08-06 적용 완료.** 이제 C 만 남았다.
+- **C 의 품질 평가에는 프리뷰가 필요하므로 YAML `output.formats` 에 `mp4`/`jpg` 를 명시한다.**
+  A 적용으로 기본값이 `glb` 가 됐고 렌더가 formats 로 게이팅되므로, 안 적으면 프리뷰가 안 나온다(§3-2).
 - 회차마다 디스크가 ~400MB 쌓인다. `t2o_results/` 와 샌드박스 assets 를 주기적으로 정리.
 
 ---
 
-## 2. 실험 A — 프리뷰 렌더를 `formats` 로 게이팅
+## 2. 실험 A — 프리뷰 렌더를 `formats` 로 게이팅  ✅ **적용 완료 (2026-08-06)**
+
+> **측정 없이 채택했다.** 원인·효과가 코드로 자명하고(요청하지 않은 프리뷰를 렌더),
+> GLB 산출물 경로와 무관해 리스크가 없다고 판단. before/after 실측은 생략했다.
+> 아래 §2-1~2-4 는 판단 근거와 패치 내용의 기록으로 남긴다.
+>
+> **함께 바뀐 것 — 기본 formats 가 `glb` 로 변경됐다:**
+> - `object_generate.sh:129` — `${TRELLIS_FORMATS:-glb mp4 jpg}` → `${TRELLIS_FORMATS:-glb}`
+> - `json_parse_and_inference.py:249` — argparse 기본값 `['glb','ply','mp4','jpg']` → `['glb']`
+>   (`ply` 는 v2 에 gaussian 이 없어 무의미하므로 함께 제거)
+>
+> **기본 실행에서 없어지는 것**: 턴테이블 `*_pbr.mp4` 1개 + 썸네일 `*_00Ns.jpg` 3장.
+> **그대로 남는 것**: `*.glb`, `*.glb.meta.json`, **`*_ref.png`(T2I 참조 이미지 — formats 와
+> 무관하게 항상 저장. 3D 가 이상할 때 이미지 문제인지 리프트 문제인지 가르는 디버깅 1순위)**,
+> `results.csv`, `generation.json`, `run_manifest.json`, geometry.usda + 텍스처 + USD 주입.
+>
+> 프리뷰가 필요하면 `TRELLIS_FORMATS="glb mp4 jpg"` 로 예전과 동일하게 나온다.
 
 ### 2-1. 현상 (실증 완료)
 
@@ -209,49 +230,32 @@ if self.envmap is not None:              # ← formats 와 무관
 +        if "jpg" in formats and video is not None:
 ```
 
-### 2-3. 실행
+### 2-3. 적용 후 확인 (측정 대신 수행한 것)
+
+정적 검사만 했다. 실행 측정은 생략.
 
 ```bash
-cd /home/sr/previs_proj
-
-# before (패치 전, 시드 고정)
-RUNTAG=A_before; rm -rf tmp/htest/scene_1/objects/assets
-T2I_GPU=1 TRELLIS_FORMATS="glb" stdbuf -oL -eL ./object_generate.sh \
-  tmp/htest/hidden_time.usda --no-filter -- --seed 20260805 2>&1 \
-  | stdbuf -oL python3 -u tmp/perf/stamp.py > tmp/perf/$RUNTAG.log 2>&1
-
-# ... 패치 적용 ...
-
-# after (패치 후, 동일 시드)
-RUNTAG=A_after; rm -rf tmp/htest/scene_1/objects/assets
-T2I_GPU=1 TRELLIS_FORMATS="glb" stdbuf -oL -eL ./object_generate.sh \
-  tmp/htest/hidden_time.usda --no-filter -- --seed 20260805 2>&1 \
-  | stdbuf -oL python3 -u tmp/perf/stamp.py > tmp/perf/$RUNTAG.log 2>&1
+python -m py_compile previz_pipeline/trellis2_inference_core.py \
+                     previz_pipeline/json_parse_and_inference.py   # OK
+bash -n /home/sr/previs_proj/object_generate.sh                     # OK
+python previz_pipeline/json_parse_and_inference.py --help | grep -A2 formats   # 기본값 glb 확인
 ```
 
-### 2-4. 판정 기준
+### 2-4. 나중에 검증한다면 (선택)
+
+다음 전체 실행 때 아래만 확인하면 충분하다. 별도 회차를 잡을 필요는 없다.
 
 | 항목 | 기대 |
 |---|---|
-| `render_time` 합계 | 122.5s 수준 → **≈ 0s** |
-| `save_time` | 거의 불변 (mp4/jpg 쓰기분만 감소) |
-| **GLB 면수 / 파일 크기** | **before 와 완전 동일** |
-| `geometry.usda` 크기 | before 와 동일 |
-| ③단계 성공 | `✅ 성공: 3개`, `❌ 오류: 0개` |
-| previews/ 하위 jpg·mp4 | 생성 안 됨(=의도) |
+| `results.csv` 의 `render_time` | **≈ 0s** (기존 객체당 ~41s) |
+| **GLB 면수 / 파일 크기** | 시드가 같다면 패치 전과 **완전 동일** |
+| ③단계 결과 | `✅ 성공: N개`, `❌ 오류: 0개` |
+| `previews/` 하위 | `*_ref.png` 만 있고 mp4·jpg 없음(=의도) |
 
-산출물이 1바이트라도 달라지면 패치가 렌더 외 경로를 건드린 것이다 → 롤백.
+산출물이 달라지면 렌더 외 경로를 건드린 것이다 → 롤백(§5).
 
-**회귀 확인**: `TRELLIS_FORMATS="glb mp4 jpg"` (기본값)로도 1회 돌려
-render 가 예전처럼 동작하고 mp4·jpg 가 정상 생성되는지 확인할 것.
-
-### 2-5. 결과 기록
-
-| 회차 | formats | render 합계 | save 합계 | 총 시간 | GLB 면수/크기 | 비고 |
-|---|---|---:|---:|---:|---|---|
-| A_before | glb | | | | | |
-| A_after | glb | | | | | |
-| A_regress | glb mp4 jpg | | | | | mp4/jpg 생성 확인 |
+**프리뷰 회귀 확인**(프리뷰를 다시 쓸 일이 생기면):
+`TRELLIS_FORMATS="glb mp4 jpg"` 로 1회 돌려 mp4·jpg 가 예전처럼 생성되는지 본다.
 
 ---
 
@@ -290,12 +294,21 @@ cat > /home/sr/previs_proj/tmp/perf/cfg/dec_250k.yaml <<'EOF'
 generation:
   seed: 20260805
 output:
-  formats: [glb, mp4, jpg]      # C 의 품질 평가에 프리뷰가 필요하므로 켠다
+  formats: [glb, mp4, jpg]      # ★ C 의 품질 평가에 프리뷰가 필요하므로 명시적으로 켠다
 postprocessing:
   texture_size: 1024            # 기본과 동일하게 유지(교란 방지)
   decimation_target: 250000     # ← 이 값만 회차마다 바꾼다
 EOF
 ```
+
+> ⚠️ **실험 A 적용(2026-08-06) 이후 달라진 점 — `formats` 를 반드시 명시할 것.**
+> 이제 기본값이 `glb` 이고, **프리뷰는 `formats` 에 `mp4`/`jpg` 가 있을 때만 렌더된다.**
+> C 는 면수별 결과를 **눈으로 비교**하는 실험이므로 위처럼 켜 두어야 한다.
+> 빠뜨리면 `previews/` 에 `*_ref.png`(T2I 참조 이미지)만 남아 품질 판단을 할 수 없다.
+>
+> 시간 해석 시 주의: 프리뷰를 켜면 회차마다 **객체당 ~41s 의 `render_time` 이 다시 붙는다.**
+> 이는 `decimation_target` 과 무관한 고정비다. **`save_time` 은 렌더와 분리 계측되므로
+> C 의 효과는 `save_time` 으로 보면 되고**, `total_time` 끼리 비교할 때만 렌더분을 감안하면 된다.
 
 ### 3-2-1. 파일럿 실측 (2026-08-05, 이 경로가 실제로 동작함을 확인)
 
@@ -405,18 +418,20 @@ YAML 은 실험용이다. 값이 정해지면 상시 적용되도록 배선한�
 
 A 채택 + C 채택값으로 1회 완주해 상호작용이 없는지 본다.
 
+C 채택값을 정한 뒤, **프리뷰를 끄고**(`formats: [glb]`) 1회 완주해 실사용 시간을 잡는다.
+A 는 이미 적용돼 있으므로 formats 만 `[glb]` 로 두면 렌더가 건너뛰어진다.
+
 ```bash
-# YAML 의 formats 를 [glb] 로 바꾸면 A 게이트가 렌더를 건너뛴다
 RUNTAG=AC_final; rm -rf tmp/htest/scene_1/objects/assets
 T2I_GPU=1 TRELLIS_CONFIG=tmp/perf/cfg/final.yaml stdbuf -oL -eL \
   ./object_generate.sh tmp/htest/hidden_time.usda --no-filter 2>&1 \
   | stdbuf -oL python3 -u tmp/perf/stamp.py > tmp/perf/$RUNTAG.log 2>&1
 ```
 
-| 항목 | 베이스라인 | A+C | 절감 |
+| 항목 | 베이스라인(A 이전) | A+C | 절감 |
 |---|---:|---:|---:|
 | 총 시간 | 779.0s | | |
-| render 합계 | 122.5s | | |
+| render 합계 | 122.5s | **0s (A 로 확정)** | −122.5s |
 | save 합계 | 345.7s | | |
 | ③단계 | 18.0s | | |
 | GLB 크기(평균) | 35.9MB | | |
@@ -427,7 +442,10 @@ T2I_GPU=1 TRELLIS_CONFIG=tmp/perf/cfg/final.yaml stdbuf -oL -eL \
 
 ## 5. 롤백
 
-- A: 위 2곳을 원복.
+- A (적용 완료): 되돌리려면 4곳 —
+  `trellis2_inference_core.py` 의 렌더 게이트·jpg 조건 2곳,
+  기본값 2곳(`object_generate.sh:129`, `json_parse_and_inference.py:249`).
+  **부분 롤백도 가능**: 코드는 두고 `TRELLIS_FORMATS="glb mp4 jpg"` 만 주면 예전 동작이 된다.
 - C: `TRELLIS_CONFIG` 를 빼면 즉시 기본값(1M)으로 복귀. 코드를 건드리지 않았다면 롤백 불필요.
 - 산출물: 실험은 전부 `tmp/htest` 사본에서만 이뤄지므로 `movie_usd/` 원본은 영향 없음.
   (검증: `ls -la movie_usd/hidden_time/scene_1/objects/*.usda` 의 mtime 이 실험 전과 같아야 함)

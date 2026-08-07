@@ -232,7 +232,9 @@ def parse_args():
         description="USD 증강 JSON을 TRELLIS 3D 생성 파이프라인에 투입하는 도구"
     )
     parser.add_argument('--json', required=True, help='usd_parse_and_augment.py에서 생성된 JSON 경로')
-    parser.add_argument('--model_path', default='microsoft/TRELLIS-text-xlarge', help='TRELLIS 모델 경로 혹은 HF 모델명')
+    parser.add_argument('--model_path', default=str(_HF_MODELS / 'TRELLIS.2-4B'),
+                        help='TRELLIS 모델 경로 혹은 HF 모델명 (기본: 로컬 TRELLIS.2-4B; '
+                             '--backend trellis(v1) 사용 시 v1 모델을 명시할 것)')
     parser.add_argument('--config', help='YAML 설정 경로 (미지정 시 기본 설정 사용)')
     parser.add_argument('--output', default='./outputs', help='이번 실행 출력 디렉토리')
     parser.add_argument('--run_dir', help='run 출력 디렉토리 (지정 시 output_base로 직접 사용)')
@@ -246,7 +248,9 @@ def parse_args():
     parser.add_argument('--seed', default='random', help='기본 시드값 (random 또는 정수)')
     parser.add_argument('--seed_from_json', action='store_true', help='JSON 내 seed가 있으면 사용')
     parser.add_argument('--llm_label', default='usd_aug', help='출력 구조에 표시할 LLM 라벨')
-    parser.add_argument('--formats', nargs='+', default=['glb', 'ply', 'mp4', 'jpg'], help='저장할 출력 포맷')
+    parser.add_argument('--formats', nargs='+', default=['glb'],
+                        help='저장할 출력 포맷 (기본: glb). mp4/jpg 를 넣으면 PBR 턴테이블 '
+                             '프리뷰를 렌더한다 — 객체당 ~41s 추가. ply 는 v2 에 gaussian 이 없어 무의미')
     parser.add_argument('--simplify', type=float, default=0.95, help='GLB 단순화 비율 (v1 전용)')
     parser.add_argument('--texture_size', type=int, default=1024, help='텍스처 해상도')
     parser.add_argument('--backend', choices=['trellis', 'trellis2'], default='trellis2',
@@ -275,7 +279,10 @@ def main():
             logging.error("❌ Trellis2InferenceCore를 불러올 수 없습니다 (trellis2 env에서 실행하세요).")
             return 1
         model_path = args.model_path
-        if model_path == 'microsoft/TRELLIS-text-xlarge':  # v1 기본값 → v2 로컬 모델
+        # v1 텍스트 모델명이 v2 백엔드로 흘러들어오는 사고 방지 (구 스크립트/설정 잔재).
+        if 'TRELLIS-text' in model_path:
+            logging.warning("⚠️ v1 텍스트 모델(%s)이 trellis2 백엔드에 지정됨 → 로컬 TRELLIS.2-4B 로 대체",
+                            model_path)
             model_path = str(_HF_MODELS / 'TRELLIS.2-4B')
         manager = Trellis2InferenceCore(
             model_path=model_path,

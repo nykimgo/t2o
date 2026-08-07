@@ -2,7 +2,7 @@
 
 > 파이프라인: **text → image(FLUX.1-schnell) → 3D object(TRELLIS.2, image-to-3D) → GLB → USD 주입.**
 > 이 문서는 **이 A100 서버에서 2026-07-28 실제로 검증된 실행 절차와 함정**만 담는다.
-> 설계 배경은 `SERVER_4090_SETUP.md`(서버 차이·확정 T2I 프롬프트), `../ENV_REBUILD_GUIDE.md`(env 핀 근거), `../NEW_SERVER_SETUP.md`.
+> 설계 배경은 `SERVER_4090_SETUP.md`(서버 차이·확정 T2I 프롬프트), `../ENV_REBUILD_GUIDE.md`(env 핀 근거). (`NEW_SERVER_SETUP.md` 는 A100 구서버 기준이라 2026-08-07 삭제됨.)
 
 ---
 

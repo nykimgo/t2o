@@ -5,7 +5,7 @@ TRELLIS.2 is image-conditioned, so this core inserts a Text→Image (FLUX) bridg
 before the 3D stage:
 
     prompt --(FLUX)--> reference image --(TRELLIS.2)--> MeshWithVoxel (PBR)
-           --> o_voxel.to_glb (PNG) --> GLB  --> [downstream usd_from_gltf]
+           --> o_voxel.to_glb (PNG) --> GLB  --> [downstream glb_to_usd_native]
 
 Design
 ------
@@ -20,8 +20,7 @@ Design
 * HDRI .exr is read via the ``OpenEXR`` package (the installed
   opencv-python-headless is built with OpenEXR:NO). Render is best-effort.
 
-STATUS: written against the confirmed TRELLIS.2 API but NOT yet end-to-end
-tested — blocked on gated ``facebook/dinov3-vitl16-pretrain-lvd1689m`` access.
+E2E 검증: previz_pipeline/e2e_test.py 로 확인됨 (TRELLIS2_MIGRATION.md 참고).
 """
 from __future__ import annotations
 
@@ -249,7 +248,11 @@ class Trellis2InferenceCore(TrellisInferenceCore):
         # --- Stage C: PBR preview render (best-effort) ---
         render_start = time.time()
         video = None
-        if self.envmap is not None:
+        # 프리뷰(mp4/jpg)를 실제로 요청했을 때만 렌더한다. 이 게이트가 없으면
+        # --formats glb 로도 120프레임 턴테이블 렌더(객체당 ~41s, 실측)를 그대로
+        # 지불한다. GLB 산출물은 이 렌더와 무관하게 생성되므로 건너뛰어도 안전하다.
+        want_preview = ("mp4" in formats) or ("jpg" in formats)
+        if want_preview and self.envmap is not None:
             try:
                 video = render_utils.make_pbr_vis_frames(
                     render_utils.render_video(mesh, envmap=self.envmap))
@@ -301,7 +304,7 @@ class Trellis2InferenceCore(TrellisInferenceCore):
             saved_files.append(str(mp4_path))
             logging.info(f"💾 PBR video saved: {mp4_name}")
 
-        if ("jpg" in formats or video is not None) and video is not None:
+        if "jpg" in formats and video is not None:
             try:
                 for sec in (2, 4, 6):
                     idx = sec * 15
