@@ -72,7 +72,7 @@ class TextToImage:
         except ImportError as e:  # pragma: no cover - env guard
             raise ImportError(
                 "diffusers is required for the T2I stage. "
-                "Install into the t2i env: pip install 'diffusers>=0.32' accelerate"
+                "Install into the trellis2 env: pip install 'diffusers>=0.32' accelerate"
             ) from e
 
         src = self.model_path if os.path.exists(self.model_path) else _MODEL_ID

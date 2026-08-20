@@ -94,11 +94,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_HDRI = str(_REPO_ROOT / "trellis2_src/assets/hdri/forest.exr")
 _AABB = [[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]]
 
-# FLUX runs in an isolated env — invoked as a subprocess. The t2i env is a
-# sibling of the active (trellis2) env under <conda>/envs/; override with
-# T2I_PYTHON / T2I_SCRIPT if the layout differs.
-_T2I_PYTHON = os.environ.get(
-    "T2I_PYTHON", str(Path(sys.prefix).parent / "t2i" / "bin" / "python"))
+# FLUX runs as a subprocess to keep its VRAM lifecycle separate from TRELLIS.2,
+# but in the same env as this process (the separate t2i env was folded into
+# trellis2 — ENV_REBUILD_GUIDE.md §6). Override with T2I_PYTHON / T2I_SCRIPT.
+_T2I_PYTHON = os.environ.get("T2I_PYTHON", sys.executable)
 _T2I_SCRIPT = os.environ.get(
     "T2I_SCRIPT", str(_REPO_ROOT / "previz_pipeline" / "text_to_image.py"))
 
@@ -173,9 +172,9 @@ class Trellis2InferenceCore(TrellisInferenceCore):
         if t2i_gpu:
             # The subprocess then sees it as cuda:0 regardless of the index.
             env["CUDA_VISIBLE_DEVICES"] = t2i_gpu
-            logging.info(f"🎨 T2I (subprocess/t2i env, GPU {t2i_gpu}): {prompt[:60]}")
+            logging.info(f"🎨 T2I (subprocess, GPU {t2i_gpu}): {prompt[:60]}")
         else:
-            logging.info(f"🎨 T2I (subprocess/t2i env): {prompt[:60]}")
+            logging.info(f"🎨 T2I (subprocess): {prompt[:60]}")
         proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if proc.returncode != 0 or not os.path.exists(out_path):
             raise RuntimeError(f"T2I subprocess failed (rc={proc.returncode}):\n{proc.stderr[-1500:]}")

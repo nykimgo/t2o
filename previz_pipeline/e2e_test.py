@@ -1,5 +1,5 @@
 """E2E functional test for Trellis2InferenceCore.
-Exercises the full glue: prompt -> FLUX (subprocess/t2i env) -> TRELLIS.2 ->
+Exercises the full glue: prompt -> FLUX (subprocess, same env) -> TRELLIS.2 ->
 o_voxel to_glb (PNG). Uses FLUX.1-schnell (Apache-2.0), which is what the
 shipping configuration must use; the earlier dev-only run was a functional
 stand-in from before the schnell gate was accepted.

@@ -18,8 +18,11 @@ try:
     # v2 image-to-3D backend (TRELLIS.2 + FLUX). Import-guarded so the v1 path
     # still works in envs where trellis2/o_voxel aren't installed.
     from trellis2_inference_core import Trellis2InferenceCore
-except Exception:
+except Exception as _trellis2_import_err:
     Trellis2InferenceCore = None
+    _TRELLIS2_IMPORT_ERROR = _trellis2_import_err
+else:
+    _TRELLIS2_IMPORT_ERROR = None
 
 
 def _canonical_object_path(object_path: str) -> str:
@@ -277,6 +280,8 @@ def main():
     if args.backend == 'trellis2':
         if Trellis2InferenceCore is None:
             logging.error("❌ Trellis2InferenceCore를 불러올 수 없습니다 (trellis2 env에서 실행하세요).")
+            if _TRELLIS2_IMPORT_ERROR is not None:
+                logging.error("   import 오류: %s", _TRELLIS2_IMPORT_ERROR)
             return 1
         model_path = args.model_path
         # v1 텍스트 모델명이 v2 백엔드로 흘러들어오는 사고 방지 (구 스크립트/설정 잔재).

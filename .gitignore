@@ -401,6 +401,9 @@ FodyWeavers.xsd
 hf_models
 hf_models/
 assets/
+# AutoRigging 모캡 등 — 루트 assets/ 무시 규칙의 예외
+!autorigging/assets/
+!autorigging/assets/**
 t2o_results/
 movie_usds/
 *.zip
@@ -424,9 +427,14 @@ trellis2_src/
 !README.md
 !README_v1.md
 !TRELLIS2_MIGRATION.md
+!ENV_REBUILD_GUIDE.md
+!FILE_TRANSFER_MANIFEST.md
+!T2O_구성_스냅샷_20260820.md
+!T2O_현황_이서버.md
 # docs/ 와 edit3d/ 아래 문서 전부 (전역 *.md 규칙에 걸려 있었다)
 !docs/**/*.md
 !edit3d/**/*.md
+!autorigging_transfer/docs/**/*.md
 
 # 종료된 실험 — 시스템 프롬프트 v1 확정(2026-08). 4090 서버 사본이 정본.
 # 상세: docs/SERVER_4090_SETUP.md §4
@@ -435,3 +443,13 @@ prompt_lab.sh
 
 # edit3d 실험 산출물(GLB/이미지, ~1.2GB) — 결과 JSON/문서만 추적
 edit3d/phase*_out/
+
+# AutoRigging — 용량 큰 생성물·벤더 미디어·런타임 로그 (코드/모캡/샘플 리그는 추적)
+autorigging_transfer.tar.gz
+autorigging_transfer/unirig/logs/
+autorigging_transfer/unirig/assets/doc/
+autorigging_transfer/**/__pycache__/
+autorigging/**/__pycache__/
+*.usdz
+# 런타임 산출 (repo 밖 autorig_out 과 동일 성격 — 실수로 들어오면 제외)
+autorig_out/
