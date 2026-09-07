@@ -4,10 +4,30 @@
 > 되돌리면, 텍스트 단독 생성 대비 형태·비율 정확도가 오르는지 검증한다.
 > 배경: 프리비즈 품질 기준은 "형태 인식 가능성·비율 정확도"(CONTEXT.md §6)이고, near-miss는
 > 이미 USD에 실물까지 들어와 있어(`retrieval_objects/` ~29MB) 획득 비용이 0이다.
-> 실측 사례: hidden_time/object_1 — rank_1 score 0.2998, 임계값 미달로 생성 폴백.
+> 실측 사례: hidden_time의 object_1~3에 각 top-5, 총 15후보가 저장되어 있다.
+> object_1 rank_1은 score 0.2998로 임계값 미달 생성 폴백이었다.
 > 유사 방향의 선행: RefAny3D(ICLR 2026, 3D 에셋 멀티뷰 렌더를 이미지 생성의 조건으로),
 > Retrieval-Augmented Score Distillation, MV-RAG. 프로덕션 검색 DB의 "임계값 미달" 세팅은 미탐구.
-> 작성: 2026-08-06 / **착수 시점: EXP1 파일럿 이후 권장**
+> 작성: 2026-08-06 / 현실 대조·P0 비GPU 준비: 2026-08-07
+> **GPU 착수 시점: EXP1 생성·리깅 종료 및 산출물 고정 이후**
+
+## 0. 2026-08-07 코드 현실과 실행 경계
+
+- EXP1은 파일럿을 마쳤고 `EXP1_rigging/`에서 본실험 산출물을 생성 중이다. EXP2의 GPU
+  작업(Qwen/Edit, FLUX, TRELLIS.2)은 EXP1과 동시에 실행하지 않는다.
+- EXP1의 `s2_lift.py`에는 TRELLIS.2가 반환한 **메모리상 mesh**의 4뷰 렌더가 구현되어
+  있다. 기존 USDC/GLB를 입력으로 받는 렌더러는 아니므로 카메라·뷰 조립 로직만 재사용한다.
+- `prompt_lab`의 `lift_only()` 인터페이스는 있지만 TRELLIS.2 adapter는
+  `NotImplementedError`이므로 경유하지 않는다. 실제 lift adapter는 원본 코드를 수정하지
+  않으면서 `previz_pipeline/trellis2_inference_core.py`의 검증된 `self.pipeline.run(...)`
+  호출과 sampler/preprocess 설정을 재사용한다.
+- 객체 설명은 단일 `description_en`이 아니다. 실제 customData의
+  `base_description.{en,ko}`와 `appearance.{en,ko}`가 생성·평가 설명의 정본이다. 반면
+  `retrieval_result.query_text`는 검색 당시의 `name.ko + ". " + appearance.ko` 기록이므로
+  생성 target text와 혼용하지 않는다.
+- P0 비GPU 준비 코드는 공유 파이프라인을 수정하지 않고 프로젝트 루트의
+  `EXP2_nearmiss/`에 격리했다. GPU 번호·개수·락은 고정하지 않으며 실제 실행 서버에서
+  adapter 실행 인자 또는 외부 환경으로 지정한다.
 
 ---
 
@@ -29,7 +49,7 @@ H2가 사실이면 실용적 함의가 크다: 검색 임계값을 2단으로 �
 | --- | --- | --- |
 | A0 | 텍스트 → FLUX → TRELLIS.2 (현행) | baseline |
 | A1 | near-miss 멀티뷰 렌더 + 지시문 → **이미지 편집 모델** → 참조 이미지 → TRELLIS.2 | 본 제안. "이 형태를 유지하되 대상 객체로 수정" |
-| A2 | near-miss 렌더 → 직접 lift (`lift_only()` 재활용, `prompt_lab/previs_lab/pipeline.py:178`) | 대조군 — 편집 없이 그대로 3D화하면 어디까지 가나 |
+| A2 | near-miss 대표 렌더 → `trellis2_inference_core.py`의 I2O 호출 계약으로 직접 lift | 대조군 — `prompt_lab.lift_only()`는 사용하지 않음 |
 
 **A1 편집 모델 선정 제약 (라이선스 — CONTEXT.md §6)**:
 FLUX.1 Kontext [dev]는 비상업 라이선스라 **제품 경로 후보에서 제외** (진단 용도만).
@@ -52,14 +72,22 @@ FLUX.1 Kontext [dev]는 비상업 라이선스라 **제품 경로 후보에서 �
 
 총 런 수(예): 15객체 × 3경로 × 2시드 = **90런** + 편집 단계.
 
+**현재 실존 표본의 정확한 규모**: target 객체는 3개(갈매기·스마트폰·차량), 후보는 각
+top-5로 15개다. object_2는 질의가 스마트폰인데 후보 다수가 seabird라 near-miss라기보다
+검색 실패에 가깝다. 15후보를 독립 객체 15개로 간주하면 pseudoreplication이므로,
+파일럿에서는 `object_key`로 군집을 보존하고 본실험 12~15객체 조건은 합성 케이스 확보 뒤
+충족한다. 후보별 A0 행은 비교표 정렬을 위해 manifest에 존재하지만 실제 생성 산출물은
+`object_key + seed + prompt hash` 단위로 중복 제거한다. 준비된 plan은 A0 산출물과 A1/A2의
+공통 참조 렌더에 `execute_once`/`reuse_from_run_id`를 기록해 중복 실행 대상을 명시한다.
+
 ## 4. 측정 (종속변수)
 
 | 지표 | 방법 | 비고 |
 | --- | --- | --- |
 | 형태 인식 가능성 | 사람 채점 5점 — "렌더만 보고 무엇인지 알아볼 수 있나" | 주 사용자 관점(연출·감독, §3). 블라인드 채점 |
 | 비율 정확도 | 사람 채점 5점 — 의도 기술문 대비 비례·구조 | 〃 |
-| 의미 정합 | CLIP/DINO 유사도 (description_en ↔ 4뷰 렌더) | 자동 보조 지표 |
-| 참조 누출 | near-miss와의 과유사 여부 — "검색이 미달 판정한 것을 그대로 복제하지 않았나" | A1·A2의 함정 검출. DINO 유사도 + 사람 확인 |
+| 의미 정합 | VQAScore 또는 CLIP text-image (`base_description.en` + `appearance.en` ↔ 4뷰) | 자동 보조 지표. 정확한 모델 revision 고정 |
+| 참조 누출 | near-miss와의 과유사 여부 — "검색이 미달 판정한 것을 그대로 복제하지 않았나" | A1·A2의 함정 검출. DINOv2 신규 설치 또는 CLIP image-image + 사람 확인 |
 | 자세 오염 (H3) | 생물 객체 한정: EXP1의 S1·S2 채점 재사용 | 참조 자세 vs 스캐폴딩 문구 충돌 관찰 |
 | 비용 | 경로별 wall-clock | A1의 편집 단계 추가 비용 정량화 |
 
@@ -73,10 +101,13 @@ FLUX.1 Kontext [dev]는 비상업 라이선스라 **제품 경로 후보에서 �
 
 ## 6. 실행 절차
 
-- **P0 인프라 (2~4일)**: ① `retrieval_objects/`의 usdc → 멀티뷰 렌더 스크립트
-  (기존 프리뷰 렌더 코드 재활용 가능성 확인) ② Qwen-Image-Edit 탑재 테스트(24GB 제약)
+- **P0a 비GPU 준비 (완료, `EXP2_nearmiss/`)**: ① `retrieval_result` reader와 실전 표본
+  inventory ② 실행 manifest와 append-only JSONL/CSV schema ③ A0/A1/A2 stage orchestration
+  dry-run ④ USDC/GLB CPU 로딩·경계 상자·4뷰 카메라 계산 prototype.
+- **P0b GPU/렌더 선행 작업 (EXP1 종료 후)**: ① CPU prototype의 카메라 계약을 실제
+  raster renderer에 연결 ② Qwen-Image-Edit 단일 GPU 탑재 테스트(양자화 여부 포함)
   ③ A1 지시문 템플릿 초안 ("preserve overall shape and proportions, change to a <대상>...")
-  ④ 검색 담당자에게 DB score 분포·접근 요청
+  ④ 검색 담당자에게 DB score 분포·접근 요청.
 - **P1 파일럿 (1일)**: 실전 near-miss 케이스(hidden_time/object_1 포함) 2~3건으로
   A0/A1/A2 전 경로 관통. 편집 결과의 질을 눈으로 확인하고 지시문 조정.
 - **P2 본실험 (1~2일)**: 90런. 런별 CSV (object, path, score_bin, seed, 각 지표, 시간).
@@ -94,7 +125,22 @@ FLUX.1 Kontext [dev]는 비상업 라이선스라 **제품 경로 후보에서 �
 ## 8. 리스크
 
 - Qwen-Image-Edit 24GB 탑재 실패 → 양자화 / 파일럿 한정 Kontext dev(비상업, 진단만) / API 대체
-- usdc 렌더 파이프 구축 공수가 예상보다 클 수 있음 → P0에서 조기 판단, 크면 일정 연기
-- 실전 near-miss 표본이 적음 (현재 확인 1건) → 합성 케이스로 보강하되 결과 해석 시 구분
+- usdc 렌더 파이프 구축 공수가 예상보다 클 수 있음 → CPU 로딩·카메라 prototype은 완료,
+  실제 raster backend는 P0b에서 조기 판단
+- 실전 near-miss 표본이 적음 (3객체·15후보, 유효 near-miss는 사실상 object_1과
+  object_3 중심) → 합성 케이스로 보강하되 결과 해석 시 구분
 - 검색 DB 접근 협조 지연 → 실전 케이스만으로 축소 파일럿 먼저
 - A1 편집이 참조를 과하게 복제 → 참조 누출 지표로 검출, 지시문에서 창작 자유도 조정
+
+## 9. 비GPU 준비 산출물과 재현 명령
+
+`EXP2_nearmiss/README.md`의 명령으로 inventory와 manifest를 재생성한다. 현재 manifest는
+15후보 × 3경로 × 2시드 = 90행이며, 각 행은 `object_key`, `case_id`, retrieval UID/rank/score,
+원본 경로, 예상 산출물 경로를 가진다. `prompt_snapshot`은 의도적으로
+`UNRESOLVED_BEFORE_GPU_RUN` 상태다. EXP1 결론과 실제 실행 코드가 고정된 뒤 prompt 전문,
+scaffolding digest, 모델 revision, code commit을 채우기 전에는 GPU 본실험을 시작하지 않는다.
+
+Canonical EXP2 렌더 뷰는 `front / side / top / three_quarter`로 고정했다. CPU prototype은
+USD stage의 up-axis와 world bound 또는 GLB scene bounds로 네 카메라의 camera-to-world와
+world-to-camera 행렬을 계산한다. 실제 raster backend도 이 계약과 동일한 FOV·margin을
+사용해야 한다.

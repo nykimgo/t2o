@@ -217,10 +217,12 @@ class Trellis2InferenceCore(TrellisInferenceCore):
             self.envmap = None
 
     def _t2i_generate(self, prompt: str, seed: int, out_path: str) -> Image.Image:
-        """Run FLUX in the isolated ``t2i`` env (subprocess) and load the PNG.
+        """Run FLUX in a subprocess and load the PNG it wrote.
 
-        Kept out-of-process because FLUX and TRELLIS.2 need different
-        transformers versions — the two cannot share one interpreter.
+        Kept out-of-process for VRAM, not for env isolation: FLUX now runs in
+        this same env, and ending the process hands its VRAM back in full. That
+        is what makes the single-card "generate all images, then lift" batch
+        order work.
 
         VRAM: schnell in bf16 barely fits a 24GB card even with CPU offload
         (measured ~23.4GB peak on an empty 4090). TRELLIS.2 is already resident
@@ -291,19 +293,71 @@ class Trellis2InferenceCore(TrellisInferenceCore):
         t2i_time = time.time() - gen_start
         logging.info(f"⏱️  [T2I] {object_name}: {t2i_time:.1f}s")
 
-        # --- Stage B: Image -> 3D (TRELLIS.2) ---
-        i2o_start = time.time()
-        try:
-            mesh = self.pipeline.run(
-                image,
-                seed=seed,
+        # --- Stage B: Image -> 3D (TRELLIS.2) + 빌보드(깊이붕괴) 게이트 ---
+        # TRELLIS.2 가 가끔(EXP1 실측 5/200=2.5%) 메시를 종잇장으로 붕괴시킨다.
+        # 감지는 bbox 두께비 계산이라 무비용(~1ms)이므로 항상 수행·로그하고,
+        # 자동 재시도(lift 시드 재롤 → 그래도면 T2I 이미지 재생성)는 MESH_GATE=0 으로
+        # 끌 수 있다(기본 ON). 임계 0.02 는 EXP1 전수 스캔에서 무오탐 — 진짜 붕괴는
+        # 전부 0.002 근처, 뱀처럼 원래 얇은 지오메트리는 0.036 이상이었다.
+        # 근거: EXP1_rigging/EXP1_ANALYSIS.md §9-3·§10-2, flatness.csv
+        def _lift_once(img, lift_seed):
+            m = self.pipeline.run(
+                img,
+                seed=lift_seed,
                 preprocess_image=True,                     # internal rembg
                 pipeline_type=self.pipeline_type,
                 sparse_structure_sampler_params=config.get("sparse_structure_sampler_params", {}),
                 shape_slat_sampler_params=config.get("shape_slat_sampler_params", {}),
                 tex_slat_sampler_params=config.get("tex_slat_sampler_params", {}),
             )[0]
-            mesh.simplify(int(postprocessing_config.get("simplify_target", 16777216)))
+            m.simplify(int(postprocessing_config.get("simplify_target", 16777216)))
+            return m
+
+        def _thickness_ratio(m) -> float:
+            v = m.vertices
+            if hasattr(v, "detach"):
+                v = v.detach().cpu().numpy()
+            elif hasattr(v, "cpu"):
+                v = v.cpu().numpy()
+            v = np.asarray(v)
+            ext = v.max(axis=0) - v.min(axis=0)
+            mx = float(ext.max())
+            return float(ext.min()) / mx if mx > 0 else 0.0
+
+        gate_retry = os.environ.get("MESH_GATE", "1") != "0"
+        gate_thr = float(os.environ.get("MESH_GATE_THRESHOLD", "0.02"))
+        i2o_start = time.time()
+        try:
+            mesh = _lift_once(image, seed)
+            ratio = _thickness_ratio(mesh)
+            logging.info(f"📐 [GATE] {object_name}: 두께비 {ratio:.4f}")
+            if ratio < gate_thr and gate_retry:
+                # 1) lift 시드 재롤 — 샘플링 요인 배제 (~25s)
+                logging.warning(
+                    f"⚠️ [GATE] 깊이붕괴 감지({ratio:.4f} < {gate_thr}) → lift 시드 재롤")
+                mesh2 = _lift_once(image, seed + 7919)
+                r2 = _thickness_ratio(mesh2)
+                if r2 >= gate_thr:
+                    mesh, ratio = mesh2, r2
+                else:
+                    # 2) 이미지 자체가 원인(예: 완전 정측면 → 깊이 단서 0)
+                    #    → T2I 재생성 후 재-lift (~55s). ref 이미지도 교체 저장된다.
+                    logging.warning(
+                        f"⚠️ [GATE] 재롤 후에도 붕괴({r2:.4f}) → T2I 이미지 재생성")
+                    image = self._t2i_generate(prompt, seed + 7919, str(ref_path))
+                    mesh3 = _lift_once(image, seed + 7919)
+                    r3 = _thickness_ratio(mesh3)
+                    # 최선의 것을 채택 (전부 붕괴면 로그만 남기고 진행 — 파이프라인을 죽이지 않는다)
+                    mesh, ratio = max(((mesh2, r2), (mesh3, r3), (mesh, ratio)),
+                                      key=lambda t: t[1])
+                    if ratio < gate_thr:
+                        logging.error(
+                            f"❌ [GATE] 재시도 2회 후에도 깊이붕괴 지속({ratio:.4f}) — 그대로 진행")
+                    else:
+                        logging.info(f"✅ [GATE] 이미지 재생성으로 회복 (두께비 {ratio:.4f})")
+            elif ratio < gate_thr:
+                logging.warning(
+                    f"⚠️ [GATE] 깊이붕괴 감지({ratio:.4f} < {gate_thr}) — MESH_GATE=0, 재시도 생략")
         except Exception as e:
             logging.error(f"❌ TRELLIS.2 run failed: {e}")
             raise
