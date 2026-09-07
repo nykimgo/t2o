@@ -94,6 +94,64 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_HDRI = str(_REPO_ROOT / "trellis2_src/assets/hdri/forest.exr")
 _AABB = [[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]]
 
+
+def _ensure_o_voxel_no_nvdiffrast() -> None:
+    """설치본 o_voxel 이 nvdiffrast 버전이면 patches/ 를 자동 적용한다.
+
+    setup.sh 로 env 를 재구축하면 site-packages 의 o_voxel 이 원본(= nvdiffrast,
+    NVIDIA 비상업 라이선스)으로 되돌아간다. 사람이 ENV_REBUILD_GUIDE §함정 6 을
+    기억해 patch 스크립트를 다시 돌려야 하는 구조는 언젠가 반드시 잊히고, 잊혀도
+    아무 에러 없이 라이선스 위반 상태로 조용히 돌아간다. 그래서 배송 경로 코드가
+    로드 시점에 직접 확인하고, 스크립트(멱등·원본 검증 포함)를 자동 실행한다.
+    """
+    import o_voxel.postprocess as _pp
+    if "uv_raster" in Path(_pp.__file__).read_text(encoding="utf-8"):
+        return  # 이미 패치됨 (정상 상태)
+
+    script = _REPO_ROOT / "patches" / "apply_o_voxel_no_nvdiffrast.sh"
+    logging.warning("⚠️ o_voxel 이 nvdiffrast 원본 상태 (env 재구축?) — 패치 자동 적용")
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(
+            "o_voxel nvdiffrast 제거 패치 자동 적용 실패 — nvdiffrast(비상업 전용)로는 "
+            f"진행하지 않는다. 수동 실행: {script}\n{r.stdout}\n{r.stderr}")
+
+    import importlib
+    importlib.reload(_pp)
+    if "uv_raster" not in Path(_pp.__file__).read_text(encoding="utf-8"):
+        raise RuntimeError(f"패치 적용 후에도 o_voxel 이 nvdiffrast 상태: {_pp.__file__}")
+    logging.info("✅ o_voxel 패치 자동 적용 완료 (nvdiffrast 제거)")
+
+
+# CC BY-NC 라 상업 사용 불가 — MIT 인 원저자 모델로 강제한다. 두 모델은 같은
+# BiRefNet 아키텍처이고, 현행 §9 프롬프트 산출물에서 IoU 0.99+/bbox 이동 ≤2px 로
+# 실질 동일함을 검증했다 (experiments/rembg_swap/).
+_REMBG_NC = "briaai/RMBG-2.0"
+_REMBG_MIT = "ZhengPeng7/BiRefNet"
+
+
+def _ensure_rembg_commercial(model_path: str) -> None:
+    """pipeline.json 의 rembg 가 비상업(briaai) 모델이면 MIT 모델로 고쳐 쓴다.
+
+    hf_models/ 는 gitignore 대상이라 모델을 재다운로드하면 업스트림 기본값
+    (briaai/RMBG-2.0, CC BY-NC)으로 조용히 되돌아간다. o_voxel 가드와 같은 이유로
+    로드 시점에 검사해 자동 교정한다. from_pretrained 가 rembg 를 즉시 인스턴스화
+    하므로 반드시 로드 **전에** json 을 고쳐야 NC 가중치가 로드조차 되지 않는다.
+    """
+    fixed = []
+    for fname in ("pipeline.json", "texturing_pipeline.json"):
+        p = Path(model_path) / fname
+        if not p.exists():
+            continue
+        text = p.read_text(encoding="utf-8")
+        if _REMBG_NC in text:
+            p.write_text(text.replace(_REMBG_NC, _REMBG_MIT), encoding="utf-8")
+            fixed.append(fname)
+    if fixed:
+        logging.warning(
+            "⚠️ rembg 가 비상업 모델(%s)로 되돌아가 있었음 (모델 재다운로드?) — "
+            "%s 를 %s 로 자동 교정", _REMBG_NC, "/".join(fixed), _REMBG_MIT)
+
 # FLUX runs as a subprocess to keep its VRAM lifecycle separate from TRELLIS.2,
 # but in the same env as this process (the separate t2i env was folded into
 # trellis2 — ENV_REBUILD_GUIDE.md §6). Override with T2I_PYTHON / T2I_SCRIPT.
@@ -131,9 +189,18 @@ class Trellis2InferenceCore(TrellisInferenceCore):
 
     # -- overridden: load TRELLIS.2 + FLUX + envmap (replaces TrellisTextTo3D) --
     def load_pipeline(self) -> None:
+        _ensure_o_voxel_no_nvdiffrast()  # env 재구축 후 패치 유실 자동 복구
         logging.info(f"🔄 Loading TRELLIS.2 pipeline from: {self.model_path}")
         src = self.model_path if os.path.exists(self.model_path) else "microsoft/TRELLIS.2-4B"
+        if os.path.isdir(src):
+            _ensure_rembg_commercial(src)  # 모델 재다운로드 후 NC rembg 복귀 자동 교정
         self.pipeline = Trellis2ImageTo3DPipeline.from_pretrained(src)
+        if not os.path.isdir(src):
+            # 허브 폴백은 업스트림 pipeline.json(= briaai/RMBG-2.0, CC BY-NC)을
+            # 그대로 쓰므로 로드 후 rembg 인스턴스를 MIT 모델로 갈아끼운다.
+            from trellis2.pipelines.rembg import BiRefNet as _BiRefNet
+            self.pipeline.rembg_model = _BiRefNet(model_name=_REMBG_MIT)
+            logging.warning("⚠️ 허브 폴백 로드 — rembg 를 %s 로 강제 교체", _REMBG_MIT)
         if torch.cuda.is_available():
             self.pipeline.cuda()
             logging.info("✅ TRELLIS.2 pipeline on GPU")

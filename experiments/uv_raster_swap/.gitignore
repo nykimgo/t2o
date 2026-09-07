@@ -1,0 +1,8 @@
+# Regenerable, and large: ~2.7GB of captured tensors, cached atlases and GLBs.
+# capture_inputs.py rebuilds captures/; everything else falls out of the scripts.
+captures/
+atlas_cache/
+compare_out/
+verify_out/
+*.log
+__pycache__/

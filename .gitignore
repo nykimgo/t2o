@@ -435,6 +435,9 @@ trellis2_src/
 !docs/**/*.md
 !edit3d/**/*.md
 !autorigging_transfer/docs/**/*.md
+# 라이선스 고지·실험 기록 — 상업화 근거 문서라 반드시 추적 (ENV_REBUILD_GUIDE 는 위에서 이미 예외)
+!THIRD_PARTY_NOTICES.md
+!experiments/**/*.md
 
 # 종료된 실험 — 시스템 프롬프트 v1 확정(2026-08). 4090 서버 사본이 정본.
 # 상세: docs/SERVER_4090_SETUP.md §4

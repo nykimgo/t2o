@@ -107,6 +107,9 @@ sed -i 's/sudo //g' setup.sh        # setup.sh 에서 sudo 제거
 # flash-attn 은 빼고 실행 (아래 [함정 1])
 . ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
 conda activate trellis2             # 이름이 다르면 conda rename
+
+# [함정 6] o_voxel 의 nvdiffrast 의존성 제거 — 아래 참고
+cd <repo>/t2o_pipeline && ./patches/apply_o_voxel_no_nvdiffrast.sh
 ```
 
 ### 함정 1 — flash-attn: 소스 빌드 대신 prebuilt wheel
@@ -149,6 +152,32 @@ pip install --no-deps opencv-python-headless==4.11.0.86
 ```bash
 pip install transformers==4.56.2    # huggingface-hub 0.36.2 동반
 ```
+
+### 함정 6 — o_voxel 의 nvdiffrast 의존성 제거 (상업화 필수)
+`o_voxel.postprocess.to_glb` 의 텍스처 베이킹이 `nvdiffrast` 를 쓴다. nvdiffrast/nvdiffrec 는
+**NVIDIA Source Code License = 비상업 전용**이라 사업화하려면 배송 경로에 남아 있으면 안 된다.
+이 호출이 GLB 산출 경로의 마지막 nvdiffrast 의존성이라 여기만 걷어내면 된다.
+
+```bash
+cd <repo>/t2o_pipeline
+./patches/apply_o_voxel_no_nvdiffrast.sh    # 멱등, 재실행 안전
+```
+
+`trellis2_src/` 가 `.gitignore` 대상이라 수정분이 버전관리에 안 남는다. 그래서 패치를
+`patches/` 에 두고 스크립트로 입히는 구조다.
+
+**잊어도 안전하다**: `trellis2_inference_core.load_pipeline()` 이 로드 시점에 설치본을
+검사해서 nvdiffrast 원본 상태면 이 스크립트를 자동 실행한다
+(`_ensure_o_voxel_no_nvdiffrast`, 재구축 시뮬레이션으로 검증됨). 자동 적용마저 실패하면
+조용히 nvdiffrast 로 돌지 않고 RuntimeError 로 죽는다. 위 수동 실행은 재구축 직후
+검증 단계를 파이프라인 실행 전에 끝내고 싶을 때만 필요하다.
+
+대체 구현은 순수 torch(의존성 0 추가)이며 실제 TRELLIS.2 출력으로 검증했다:
+지오메트리에서 구워지는 텍셀 99.7%+ 비트동일, PSNR 69~85 dB, 불일치 지점은 fp64 재계산 결과
+대체 구현이 더 정확하다. 근거·재현 방법은 `experiments/uv_raster_swap/FINDINGS.md`.
+
+> 남은 nvdiffrast 사용처는 프리뷰 렌더(`trellis2/renderers/*`)뿐이고 `want_preview` 로
+> 게이팅돼 있다 — 상업 배포에서는 `--formats` 에 `mp4`/`jpg` 를 넣지 말 것.
 
 ---
 
