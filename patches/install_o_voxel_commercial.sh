@@ -17,6 +17,7 @@ install_to() {
 
     install -m 0644 "${OVERRIDE_DIR}/postprocess.py" "${target}/postprocess.py"
     install -m 0644 "${OVERRIDE_DIR}/uv_raster.py" "${target}/uv_raster.py"
+    rm -f "${target}/postprocess.py.orig"
     rm -rf "${target}/__pycache__"
     echo "✅ ${label}: 상업 배포용 파일 적용"
 }
