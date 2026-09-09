@@ -28,13 +28,12 @@ assets 폴더(예: scene_n/objects/assets/{object_name})에 저장하고,
 import argparse
 import os
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Tuple
 
 try:
-    from pxr import Usd, UsdGeom, UsdShade, Sdf
+    from pxr import Usd, UsdShade, Sdf
 except ImportError:
     print("❌ pxr(USD Python 바인딩)를 import할 수 없습니다. USD가 설치되어 있는지 확인하세요.")
     raise

@@ -30,7 +30,6 @@ usd_from_gltf 빌드 모두 불필요.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -124,7 +123,7 @@ def convert(glb_path: str, out_usd: str, root_prim_name: str,
     stage.SetDefaultPrim(root.GetPrim())
 
     # -- Materials --------------------------------------------------------
-    mat_scope = UsdGeom.Scope.Define(stage, f"/{object_name}/Materials")
+    UsdGeom.Scope.Define(stage, f"/{object_name}/Materials")  # scope 정의 부수효과
     material = UsdShade.Material.Define(
         stage, f"/{object_name}/Materials/material0")
 

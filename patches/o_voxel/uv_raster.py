@@ -1,15 +1,9 @@
-"""Dependency-free UV-space triangle rasterizer, replacing nvdiffrast in to_glb.
+"""Dependency-free UV-space triangle rasterizer for ``o_voxel.to_glb``.
 
 Why this exists
 ---------------
 `o_voxel.postprocess.to_glb` bakes the texture by rasterizing the UV atlas and
 asking, for every texel, "which triangle covers me and at what barycentric?".
-It does that with `nvdiffrast` (`dr.RasterizeCudaContext` / `dr.rasterize` /
-`dr.interpolate`), which ships under the NVIDIA Source Code License — research
-and evaluation only, no commercial use. That single call site is the only hard
-nvdiffrast dependency on the GLB export path, so replacing it clears the whole
-shipping pipeline.
-
 Nothing here needs to be differentiable: to_glb only reads the coverage mask and
 the interpolated positions. That drops the reason to reach for a full
 differentiable-rendering library (PyTorch3D, Kaolin) and lets this stay ~150
@@ -22,27 +16,15 @@ texels, which after decimation means ~2 texels per triangle — the bboxes are
 tiny, so enumerating every (texel, triangle) candidate pair costs ~3*T^2 work
 total and vectorizes cleanly. No tiling/binning machinery needed.
 
-Conventions match nvdiffrast so the output is a drop-in `rast` tensor:
+The output follows the existing ``o_voxel`` `rast` tensor convention:
   * pixel centers sit at `uv * resolution - 0.5`
   * `rast[..., 0:2]` are the barycentrics of vertices 0 and 1 (vertex 2 gets
     `1 - u - v`), `rast[..., 2]` is z (always 0 here), `rast[..., 3]` is
     `triangle_id + 1` with 0 meaning "not covered"
-  * row index increases with v, i.e. no vertical flip. nvdiffrast is documented
-    as OpenGL bottom-left-origin, but its CUDA rasterizer writes rows in
-    increasing-v order; test_conventions.py measures this rather than trusting
-    the docs, and `flip_y=True` exists only to re-check that calibration.
+  * row index increases with v, i.e. no vertical flip.
 
 Ties (a texel center landing exactly on a shared edge) resolve to the highest
-triangle index. nvdiffrast's own tie-break under an all-zero depth buffer is
-unspecified, and to_glb's chunked `torch.where` loop already biases toward later
-chunks, i.e. higher indices — so this matches the existing bias and, unlike a
-z-buffer race, is deterministic. Measured to barely matter: switching to lowest
-index moves the disagreement count by ~3%.
-
-Verified against nvdiffrast on real TRELLIS.2 output — 99.7%+ of geometry-baked
-texels bit-identical, 69-85 dB PSNR, and where coverage disagrees an fp64
-recomputation puts this implementation on the correct side. Harness, numbers and
-method: experiments/uv_raster_swap/ (see FINDINGS.md).
+triangle index. This matches the existing chunk-order bias and is deterministic.
 """
 from typing import Optional, Tuple
 
@@ -63,13 +45,13 @@ def rasterize_uv(
     max_candidates: int = 1 << 24,
     tie_break: str = "amax",
 ) -> torch.Tensor:
-    """Rasterize a UV atlas into an nvdiffrast-compatible `rast` tensor.
+    """Rasterize a UV atlas into an ``o_voxel``-compatible `rast` tensor.
 
     Args:
         uvs: (V, 2) UV coordinates in [0, 1].
         faces: (F, 3) vertex indices.
         resolution: output texture is (resolution, resolution).
-        flip_y: mirror rows vertically. False matches nvdiffrast (see module docstring).
+        flip_y: mirror rows vertically.
         max_candidates: cap on candidate (texel, triangle) pairs held at once;
             bounds peak memory on dense atlases.
         tie_break: which triangle wins a texel claimed by several — "amax"

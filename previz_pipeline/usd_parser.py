@@ -43,7 +43,6 @@ except ImportError:
         possible_paths.insert(0, os.path.join(usd_root, "lib", "python"))
     
     # Python 버전별 경로 추가
-    import sysconfig
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
     for base_path in possible_paths[:]:  # 복사본 사용
         versioned_path = os.path.join(base_path, python_version, "site-packages")

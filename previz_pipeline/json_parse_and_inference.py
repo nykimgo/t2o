@@ -12,11 +12,11 @@ _HF_MODELS = _REPO_ROOT / 'hf_models'
 _DEFAULT_BASE_OUTPUT = os.environ.get(
     'TRELLIS_BASE_OUTPUT', str(_REPO_ROOT / 't2o_results'))
 
+from t2i_config import DEFAULT_T2I_MODEL_PATH
 from bilingual import pick_lang
-from trellis_inference_core import TrellisInferenceCore
 try:
-    # v2 image-to-3D backend (TRELLIS.2 + FLUX). Import-guarded so the v1 path
-    # still works in envs where trellis2/o_voxel aren't installed.
+    # TRELLIS.2 + ERNIE image-to-3D backend. Import-guarded so --help 등
+    # 비추론 경로가 trellis2/o_voxel 없는 env 에서도 동작한다.
     from trellis2_inference_core import Trellis2InferenceCore
 except Exception as _trellis2_import_err:
     Trellis2InferenceCore = None
@@ -93,36 +93,16 @@ def _derive_scene_canonical_usd_path(item: Dict[str, Any], usd_root: Optional[Pa
     return str(candidate.resolve())
 
 
-def _build_default_config(seed: Any, formats: List[str],
-                          backend: str = 'trellis2') -> Dict[str, Any]:
-    """백엔드별 기본 생성 설정.
+def _build_default_config(seed: Any, formats: List[str]) -> Dict[str, Any]:
+    """기본 생성 설정 (TRELLIS.2).
 
-    v1 과 v2 는 샘플러 파라미터의 이름과 개수가 다르다. v1 설정을 v2 로 그대로
-    넘기면 `SparseStructureFlowModel.forward() got an unexpected keyword
-    argument 'cfg_strength'` 로 죽는다.
-
-      v1: slat_sampler_params            / cfg_strength
-      v2: shape_slat_sampler_params
-          + tex_slat_sampler_params      / guidance_strength
-
-    v2 는 샘플러 파라미터를 비워 모델 기본값을 쓴다 — E2E 로 검증된 유일한 구성이
-    그것이다(previz_pipeline/e2e_test.py). v1 의 cfg_strength=7.5 를 v2 의
-    guidance_strength(기본 3.0)로 옮겨 적을 근거가 없어 옮기지 않았다.
-    튜닝이 필요하면 v2 키 이름으로 명시할 것.
+    샘플러 파라미터는 비워 모델 기본값을 쓴다 — E2E 로 검증된 유일한 구성이
+    그것이다(previz_pipeline/e2e_test.py). 튜닝이 필요하면 v2 키 이름
+    (shape_slat_sampler_params / tex_slat_sampler_params / guidance_strength)
+    으로 명시할 것.
     """
     generation: Dict[str, Any] = {'seed': seed}
-    if backend != 'trellis2':
-        generation['sparse_structure_sampler_params'] = {
-            'steps': 12, 'cfg_strength': 7.5,
-        }
-        generation['slat_sampler_params'] = {
-            'steps': 12, 'cfg_strength': 7.5,
-        }
-
     postprocessing: Dict[str, Any] = {'texture_size': 1024}
-    if backend != 'trellis2':
-        # v1 은 비율(0.95), v2 는 목표 face 수(simplify_target)라 의미가 다르다.
-        postprocessing['simplify'] = 0.95
 
     return {
         'generation': generation,
@@ -236,8 +216,7 @@ def parse_args():
     )
     parser.add_argument('--json', required=True, help='usd_parse_and_augment.py에서 생성된 JSON 경로')
     parser.add_argument('--model_path', default=str(_HF_MODELS / 'TRELLIS.2-4B'),
-                        help='TRELLIS 모델 경로 혹은 HF 모델명 (기본: 로컬 TRELLIS.2-4B; '
-                             '--backend trellis(v1) 사용 시 v1 모델을 명시할 것)')
+                        help='TRELLIS.2 모델 경로 혹은 HF 모델명 (기본: 로컬 TRELLIS.2-4B)')
     parser.add_argument('--config', help='YAML 설정 경로 (미지정 시 기본 설정 사용)')
     parser.add_argument('--output', default='./outputs', help='이번 실행 출력 디렉토리')
     parser.add_argument('--run_dir', help='run 출력 디렉토리 (지정 시 output_base로 직접 사용)')
@@ -251,15 +230,11 @@ def parse_args():
     parser.add_argument('--seed', default='random', help='기본 시드값 (random 또는 정수)')
     parser.add_argument('--seed_from_json', action='store_true', help='JSON 내 seed가 있으면 사용')
     parser.add_argument('--llm_label', default='usd_aug', help='출력 구조에 표시할 LLM 라벨')
-    parser.add_argument('--formats', nargs='+', default=['glb'],
-                        help='저장할 출력 포맷 (기본: glb). mp4/jpg 를 넣으면 PBR 턴테이블 '
-                             '프리뷰를 렌더한다 — 객체당 ~41s 추가. ply 는 v2 에 gaussian 이 없어 무의미')
-    parser.add_argument('--simplify', type=float, default=0.95, help='GLB 단순화 비율 (v1 전용)')
+    parser.add_argument('--formats', nargs='+', choices=['glb'], default=['glb'],
+                        help='저장할 출력 포맷. 배포 파이프라인은 glb만 지원')
     parser.add_argument('--texture_size', type=int, default=1024, help='텍스처 해상도')
-    parser.add_argument('--backend', choices=['trellis', 'trellis2'], default='trellis2',
-                        help='3D 생성 백엔드 (trellis=v1 text-to-3D, trellis2=v2 image-to-3D + FLUX)')
-    parser.add_argument('--t2i_model_path', default=str(_HF_MODELS / 'FLUX.1-schnell'),
-                        help='trellis2 백엔드의 Text→Image(FLUX) 모델 경로')
+    parser.add_argument('--t2i_model_path', default=DEFAULT_T2I_MODEL_PATH,
+                        help='trellis2 백엔드의 Text→Image(ERNIE-Image-Turbo) 모델 경로')
     parser.add_argument('--pipeline_type', default=None, help='TRELLIS.2 pipeline_type (기본: 모델 default)')
     return parser.parse_args()
 
@@ -277,26 +252,22 @@ def main():
     target_filter = None if args.target == 'all' else args.target
     usd_root = Path(args.usd_root).expanduser().resolve() if args.usd_root else None
 
-    if args.backend == 'trellis2':
-        if Trellis2InferenceCore is None:
-            logging.error("❌ Trellis2InferenceCore를 불러올 수 없습니다 (trellis2 env에서 실행하세요).")
-            if _TRELLIS2_IMPORT_ERROR is not None:
-                logging.error("   import 오류: %s", _TRELLIS2_IMPORT_ERROR)
-            return 1
-        model_path = args.model_path
-        # v1 텍스트 모델명이 v2 백엔드로 흘러들어오는 사고 방지 (구 스크립트/설정 잔재).
-        if 'TRELLIS-text' in model_path:
-            logging.warning("⚠️ v1 텍스트 모델(%s)이 trellis2 백엔드에 지정됨 → 로컬 TRELLIS.2-4B 로 대체",
-                            model_path)
-            model_path = str(_HF_MODELS / 'TRELLIS.2-4B')
-        manager = Trellis2InferenceCore(
-            model_path=model_path,
-            base_output_dir=args.base_output,
-            t2i_model_path=args.t2i_model_path,
-            pipeline_type=args.pipeline_type,
-        )
-    else:
-        manager = TrellisInferenceCore(model_path=args.model_path, base_output_dir=args.base_output)
+    if Trellis2InferenceCore is None:
+        logging.error("❌ Trellis2InferenceCore를 불러올 수 없습니다 (trellis2 env에서 실행하세요).")
+        if _TRELLIS2_IMPORT_ERROR is not None:
+            logging.error("   import 오류: %s", _TRELLIS2_IMPORT_ERROR)
+        return 1
+    model_path = args.model_path
+    # v1 텍스트 모델명이 흘러들어오는 사고 방지 (구 스크립트/설정 잔재).
+    if 'TRELLIS-text' in model_path:
+        logging.warning("⚠️ v1 텍스트 모델(%s) 지정됨 → 로컬 TRELLIS.2-4B 로 대체", model_path)
+        model_path = str(_HF_MODELS / 'TRELLIS.2-4B')
+    manager = Trellis2InferenceCore(
+        model_path=model_path,
+        base_output_dir=args.base_output,
+        t2i_model_path=args.t2i_model_path,
+        pipeline_type=args.pipeline_type,
+    )
     if args.run_id:
         manager.run_id = args.run_id
 
@@ -308,11 +279,7 @@ def main():
             logging.error("❌ YAML 설정을 불러오지 못했습니다.")
             return 1
     else:
-        config = _build_default_config(args.seed, args.formats, args.backend)
-        if args.backend != 'trellis2':
-            # v2 는 이 키를 읽지 않는다(simplify_target 을 쓴다). 넣어두면 적용되는
-            # 것처럼 보여 오해를 부른다.
-            config['postprocessing']['simplify'] = args.simplify
+        config = _build_default_config(args.seed, args.formats)
         config['postprocessing']['texture_size'] = args.texture_size
 
     try:

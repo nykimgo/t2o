@@ -1,13 +1,13 @@
-"""Confirmed T2I system-prompt builder (§9, prompt_lab EXPERIMENT_LOG.md, 2026-07 확정).
+"""Production T2I prompt builder: rig poses ON + three-quarter view (2026-09-09).
 
 Two templates, routed by category (생명체는 내부에서 형태 3분기):
 
   ① 무생물 (inanimate) — ablation+LOO 검증:
      "{base_description}, {appearance}, {object}, single centered object,
-      neutral background, full object visible in frame, unoccluded"
+      neutral background, full object visible in frame, unoccluded, three-quarter view"
 
-  ② 생명체 (creature) — body-plan 분류 후 고정 스캐폴딩 verbatim 삽입:
-     "{object}, <biped|quadruped|bird|insect 스캐폴딩>, {base_description}"
+  ② 생명체 (creature) — body-plan 분류 후 리깅 자세 삽입:
+     "{object}, <biped|quadruped|bird|insect 스캐폴딩>, {base_description}, three-quarter view"
      ⚠️ §9 원안은 "필드는 object만"이나, 정체성/외형 정보 보존을 위해 base_description 을
      덧붙이는 것으로 운용 중 — 동작어 충돌 여부는 리깅 실험에서 최종 판정 예정(§9 후속).
 
@@ -17,14 +17,15 @@ Body-plan 분류는 **LLM-free**다. Tripo/UniRig 의 rig-type taxonomy(biped/qu
 open-vocab 동물의 롱테일은 dict 가 못 잡을 수 있어 안전 기본값(quadruped)으로 떨어지며 경고 로그를 남긴다.
 정밀도가 필요하면 `classify_body_plan` 에 LLM(ollama) 훅을 끼울 수 있다 (§9: "LLM은 클래스 라벨만").
 
-자세 문구는 §9 고정값 verbatim — 재현성/ablation 최적화를 위해 **변조 금지**.
+리깅 자세는 §9 문구를 유지한다. 사용자 결정(2026-09-09)에 따라 기존 정면/측면
+시점은 제거하고 공통 3/4뷰를 붙인다. 포즈 OFF는 과거 실험 재현용 옵션이다.
 """
 from __future__ import annotations
 
 import logging
 from typing import Optional, Tuple
 
-# --- §9 고정 문구 (verbatim, do not reword) ---------------------------------
+# §9 pose/isolation wording retained; camera view is assembled separately.
 ISOLATION_INANIMATE = (
     "single centered object, neutral background, "
     "full object visible in frame, unoccluded"
@@ -33,21 +34,21 @@ ISOLATION_INANIMATE = (
 SCAFFOLDING = {
     "biped": (
         "in a symmetric A-pose, arms angled slightly down and away from the body, "
-        "legs straight and slightly apart, front view, neutral background, "
+        "legs straight and slightly apart, neutral background, "
         "single object, full body"
     ),
     "quadruped": (
         "standing naturally on all four legs, all four legs clearly separated and "
-        "extended, not tucked, side view, neutral background, single object, "
+        "extended, not tucked, neutral background, single object, "
         "full body in frame"
     ),
     "bird": (
-        "with wings fully spread symmetrically, standing, front view, "
+        "with wings fully spread symmetrically, standing, "
         "neutral background, single object, full body in frame"
     ),
     # insect(6족)는 §9에 없던 신규 클래스 — 업스트림 rig_type=insect 대응(잠정값, O/X 검증 전).
     "insect": (
-        "with all six legs clearly separated and extended, standing, side view, "
+        "with all six legs clearly separated and extended, standing, "
         "neutral background, single object, full body in frame"
     ),
 }
@@ -185,7 +186,7 @@ def _creature_prompt(obj: str, scaffolding: str,
     return ", ".join(p for p in parts if p)
 
 
-def build_t2i_prompt(object_name: Optional[str], appearance: Optional[str],
+def _build_default_t2i_prompt(object_name: Optional[str], appearance: Optional[str],
                      base_description: Optional[str], category: Optional[str],
                      target: Optional[str] = "object",
                      rig_type: Optional[str] = None) -> Tuple[str, Optional[str]]:
@@ -223,3 +224,26 @@ def build_t2i_prompt(object_name: Optional[str], appearance: Optional[str],
         return _creature_prompt(obj, SCAFFOLDING[plan], base_description), plan
 
     return _inanimate_prompt(obj, appearance, base_description), None
+
+
+def build_t2i_prompt(object_name: Optional[str], appearance: Optional[str],
+                     base_description: Optional[str], category: Optional[str],
+                     target: Optional[str] = "object",
+                     rig_type: Optional[str] = None, *,
+                     use_rig_pose: bool = True,
+                     view: Optional[str] = "three_quarter") -> Tuple[str, Optional[str]]:
+    """Build the production prompt with rig poses and a three-quarter camera.
+
+    Pose and camera are independent: the template never adds front/side view
+    alongside three-quarter view. Historical experiments can explicitly disable
+    rig poses and/or pass view=None, without changing body-plan classification.
+    """
+    if view not in (None, "three_quarter"):
+        raise ValueError("view must be None or 'three_quarter'")
+    prompt, body_plan = _build_default_t2i_prompt(
+        object_name, appearance, base_description, category, target, rig_type)
+    if not use_rig_pose:
+        prompt = _inanimate_prompt((object_name or "").strip(), appearance, base_description)
+    if view == "three_quarter":
+        prompt += ", three-quarter view"
+    return prompt, body_plan

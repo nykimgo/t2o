@@ -1,5 +1,11 @@
+"""Record-batch 3D generation core — 경로/이름/매니페스트/CSV 공통 헬퍼.
+
+원래 TRELLIS v1(text-to-3D)의 실행 코어였으나, v1 백엔드는 제거되었다.
+지금은 Trellis2InferenceCore(trellis2_inference_core.py)가 상속해
+배치 순회·출력 구조·기록(generation.json/CSV/GLB meta)을 재사용하는 베이스다.
+load_pipeline()/_generate_single() 은 서브클래스가 구현한다.
+"""
 import os
-import time
 import logging
 import json
 from datetime import datetime
@@ -7,31 +13,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from bilingual import pick_lang
-import torch
-import random
-
-# TRELLIS 환경 설정 (임포트 전에 설정 필요)
-os.environ['SPCONV_ALGO'] = 'native'
-os.environ['ATTN_BACKEND'] = 'xformers'
-
-os.environ.setdefault("TORCH_CUDA_ARCH_LIST", "8.9")
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-try:
-    import imageio
-    from trellis.pipelines import TrellisTextTo3DPipeline
-    from trellis.utils import render_utils, postprocessing_utils
-    TRELLIS_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ TRELLIS 모듈 임포트 실패: {e}")
-    print("💡 TRELLIS 프로젝트 루트에서 실행하거나 PYTHONPATH를 설정하세요")
-    TRELLIS_AVAILABLE = False
 
 
 class TrellisInferenceCore:
     """TRELLIS model-based 3D generation core functionality for record-based processing"""
     
-    def __init__(self, model_path: str = "microsoft/TRELLIS-text-xlarge",
+    def __init__(self, model_path: str = "microsoft/TRELLIS.2-4B",
                  base_output_dir: str = os.environ.get(
                      "TRELLIS_BASE_OUTPUT",
                      str(Path(__file__).resolve().parents[1] / "t2o_results"))):
@@ -40,9 +27,6 @@ class TrellisInferenceCore:
             model_path: TRELLIS model path (local path or HuggingFace model name)
             base_output_dir: Base directory for output files
         """
-        if not TRELLIS_AVAILABLE:
-            raise ImportError("TRELLIS modules are not available")
-            
         self.model_path = model_path
         self.base_output_dir = Path(base_output_dir)
         self.pipeline = None
@@ -136,82 +120,9 @@ class TrellisInferenceCore:
             return None
     
     def load_pipeline(self) -> None:
-        """Load TRELLIS pipeline with error handling"""
-        logging.info(f"🔄 Loading TRELLIS pipeline from: {self.model_path}")
-        try:
-            # HuggingFace 모델명인지 로컬 경로인지 판단
-            if self._is_huggingface_model(self.model_path):
-                logging.info(f"📡 Loading HuggingFace model: {self.model_path}")
-                self.pipeline = TrellisTextTo3DPipeline.from_pretrained(self.model_path)
-            elif os.path.exists(self.model_path):
-                logging.info(f"📁 Loading local model: {self.model_path}")
-                self.pipeline = TrellisTextTo3DPipeline.from_pretrained(self.model_path)
-            else:
-                # 단순 모델명인 경우 microsoft/ 접두사 추가
-                full_model_name = f"microsoft/{self.model_path}"
-                logging.info(f"📡 Loading HuggingFace model: {full_model_name}")
-                self.pipeline = TrellisTextTo3DPipeline.from_pretrained(full_model_name)
-            
-            # GPU 사용 가능시 GPU로 이동
-            if torch.cuda.is_available():
-                try:
-                    self.pipeline.cuda()
-                    logging.info("✅ Pipeline loaded on GPU successfully!")
-                except RuntimeError as e:
-                    if "out of memory" in str(e).lower():
-                        logging.warning("⚠️ GPU out of memory, using CPU")
-                        self.pipeline.cpu()
-                    else:
-                        raise
-            else:
-                logging.info("ℹ️ GPU not available, using CPU")
-            
-            # 모델 정보 출력
-            self._print_model_info()
-            
-        except Exception as e:
-            logging.error(f"❌ Pipeline loading failed: {e}")
-            raise
-    
-    def _is_huggingface_model(self, model_path: str) -> bool:
-        """Check if model path is a HuggingFace model name"""
-        # 절대 경로인 경우 로컬 경로로 간주
-        if os.path.isabs(model_path):
-            return False
-        # HuggingFace 모델명 패턴: organization/model-name (최소 2개 부분 필요)
-        # 로컬 경로가 존재하는지 확인 (상대 경로인 경우)
-        if '/' in model_path:
-            path_parts = [p for p in model_path.split('/') if p]
-            # organization/model-name 형식인지 확인 (최소 2개 부분)
-            if len(path_parts) >= 2:
-                # 로컬 경로가 존재하지 않으면 HuggingFace 모델로 간주
-                return not os.path.exists(model_path)
-        return False
-    
-    def _print_model_info(self):
-        """Print model information"""
-        try:
-            if hasattr(self.pipeline, 'models') and self.pipeline.models:
-                logging.info("📊 Model components:")
-                total_params = 0
-                for name, model in self.pipeline.models.items():
-                    if model is not None:
-                        param_count = sum(p.numel() for p in model.parameters())
-                        total_params += param_count
-                        
-                        # 양자화 상태 확인
-                        is_quantized = any(
-                            hasattr(m, '_packed_params') or 'quantized' in str(type(m)).lower()
-                            for m in model.modules()
-                        )
-                        status = "🔧INT8" if is_quantized else "📏FP32"
-                        
-                        logging.info(f"  - {name}: {param_count/1e6:.1f}M params {status}")
-                
-                logging.info(f"📊 Total parameters: {total_params/1e6:.1f}M")
-        except Exception as e:
-            logging.warning(f"⚠️ Could not get model info: {e}")
-    
+        """서브클래스(Trellis2InferenceCore)가 구현한다."""
+        raise NotImplementedError("load_pipeline() 은 백엔드 서브클래스가 구현한다")
+
     def generate_unique_name(self, base_prompt: str) -> str:
         """Generate unique object name based on prompt"""
         print(f'base_prompt: {base_prompt}')
@@ -393,7 +304,6 @@ class TrellisInferenceCore:
             shot_name = self._sanitize_path_segment(item.get('shot'), 'shot_unknown')
             target_dir_name = self._sanitize_path_segment(item.get('target_name') or predefined_name, 'item_unknown')
             target_type = item.get('target_type') or 'object'
-            asset_label_name = self._resolve_asset_label_name(item, target_type)
             
             logging.info(f"\n🎯 [{i}/{len(file_data)}] Processing: '{prompt}'")
             if predefined_name:
@@ -507,212 +417,8 @@ class TrellisInferenceCore:
                 return new_filename
 
     def _generate_single(self, prompt: str, predefined_name: Optional[str], config: Dict, formats: List[str], postprocessing_config: Dict, llm_model: Optional[str] = None, record_context: Optional[Dict[str, str]] = None) -> Dict:
-        """Generate single 3D object"""
-        start_time = time.time()
-        
-        # 객체 이름 결정
-        if predefined_name:
-            object_name = predefined_name
-        else:
-            object_name = self.generate_unique_name(prompt)
-        
-        # 시드 정보
-        seed_val = config.get('seed', "random")
-        if isinstance(seed_val, str) and seed_val.lower() == "random":
-            seed = random.randint(0, 999999)
-        else:
-            seed = int(seed_val)
-        
-        context = record_context or {}
-        scene_name = context.get('scene') or 'scene_unknown'
-        shot_name = context.get('shot') or 'shot_unknown'
-        target_dir_name = context.get('target_dir_name') or object_name
-        scene_name = self._sanitize_path_segment(scene_name, 'scene_unknown')
-        shot_name = self._sanitize_path_segment(shot_name, 'shot_unknown')
-        target_dir_name = self._sanitize_path_segment(target_dir_name, object_name or 'item_unknown')
-
-        # 결과물 저장 경로 결정
-        # 원본 USD(object_n.usda) 경로가 주어지면 그 옆의 assets 폴더에 저장합니다.
-        # 즉 usd_root_dir/scene_n/objects/object_n.usda -> usd_root_dir/scene_n/objects/assets/{object_name}
-        # 이렇게 하면 폴더 구조(scene/shot 하위 또는 scene 직속)에 무관하게 항상 원본 USD 옆에 결과가 모입니다.
-        usd_file_path = context.get('usd_file_path')
-        if usd_file_path:
-            # DCC용 assets: GLB(+ 이후 merge의 geometry.usda, bin/ 텍스처)만 저장
-            object_dir = Path(usd_file_path).resolve().parent / "assets" / target_dir_name
-            # 미리보기(ply/mp4/jpg)는 t2o_results 쪽에만 저장
-            preview_dir = self._preview_output_path(scene_name, shot_name, target_dir_name)
-        else:
-            preview_dir = self._preview_output_path(scene_name, shot_name, target_dir_name)
-            object_dir = preview_dir
-        print(f'LLM Model: {llm_model}, target object_dir: {object_dir}')
-        if preview_dir != object_dir:
-            print(f'   preview_dir: {preview_dir}')
-        object_dir.mkdir(parents=True, exist_ok=True)
-        preview_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Generation timing
-        gen_start = time.time()
-        
-        try:
-            outputs = self.pipeline.run(
-                prompt,
-                seed=seed,
-                sparse_structure_sampler_params=config.get('sparse_structure_sampler_params', {}),
-                slat_sampler_params=config.get('slat_sampler_params', {})
-            )
-        except Exception as e:
-            logging.error(f"❌ Pipeline execution failed: {e}")
-            raise
-            
-        generation_time = time.time() - gen_start
-        
-        # Render different video types
-        render_start = time.time()
-        video_gs = None
-        video_rf = None
-        video_mesh = None
-        
-        try:
-            if 'mp4' in formats:
-                video_gs = render_utils.render_video(outputs['gaussian'][0])['color']
-                video_rf = render_utils.render_video(outputs['radiance_field'][0])['color']
-                video_mesh = render_utils.render_video(outputs['mesh'][0])['normal']
-        except Exception as e:
-            logging.warning(f"⚠️ Video rendering failed: {e}")
-        
-        render_time = time.time() - render_start
-        
-        # Save outputs in requested formats
-        saved_files = []
-        glb_path_saved: Optional[Path] = None
-        save_start = time.time()
-        
-        try:
-            # GLB/PLY 등: {scene}_{name_en}_{seed} (shot 미지정 시 shot 생략)
-            asset_label_name = self._resolve_asset_label_name(context, context.get('target_type') or 'item')
-            file_prefix = self._build_file_prefix(scene_name, shot_name, asset_label_name, seed)
-            if 'glb' in formats:
-                base_filename = f"{file_prefix}.glb"
-                glb_filename = self._get_unique_filename(object_dir, base_filename)
-                glb_path = object_dir / glb_filename
-                
-                glb = postprocessing_utils.to_glb(
-                    outputs['gaussian'][0],
-                    outputs['mesh'][0],
-                    simplify=postprocessing_config.get('simplify', 0.95),
-                    texture_size=postprocessing_config.get('texture_size', 1024)
-                )
-                glb.export(str(glb_path))
-                saved_files.append(str(glb_path))
-                glb_path_saved = glb_path
-                logging.info(f"💾 GLB saved: {glb_filename}")
-                self._write_glb_meta(glb_path, {
-                    "run_id": context.get("run_id") or self.run_id,
-                    "object_path": context.get("object_path") or context.get("file_identifier"),
-                    "prompt_used": prompt,
-                    "t2i_prompt": context.get("t2i_prompt"),
-                    "description_en": context.get("description_en"),
-                    "seed": seed,
-                })
-            
-            # PLY 파일: 미리보기 디렉토리에 저장 (assets에는 GLB만)
-            if 'ply' in formats:
-                base_filename = f"{file_prefix}.ply"
-                ply_filename = self._get_unique_filename(preview_dir, base_filename)
-                ply_path = preview_dir / ply_filename
-                
-                outputs['gaussian'][0].save_ply(str(ply_path))
-                saved_files.append(str(ply_path))
-                logging.info(f"💾 PLY saved: {ply_filename}")
-            
-            # MP4 파일들: 미리보기 디렉토리에 저장
-            if 'mp4' in formats:
-                if video_gs is not None:
-                    base_filename = f"{file_prefix}_gs.mp4"
-                    gs_filename = self._get_unique_filename(preview_dir, base_filename)
-                    gs_path = preview_dir / gs_filename
-                    imageio.mimsave(str(gs_path), video_gs, fps=30)
-                    saved_files.append(str(gs_path))
-                    logging.info(f"💾 GS video saved: {gs_filename}")
-                
-                if video_rf is not None:
-                    base_filename = f"{file_prefix}_rf.mp4"
-                    rf_filename = self._get_unique_filename(preview_dir, base_filename)
-                    rf_path = preview_dir / rf_filename
-                    imageio.mimsave(str(rf_path), video_rf, fps=30)
-                    saved_files.append(str(rf_path))
-                    logging.info(f"💾 RF video saved: {rf_filename}")
-                
-                if video_mesh is not None:
-                    base_filename = f"{file_prefix}_mesh.mp4"
-                    mesh_filename = self._get_unique_filename(preview_dir, base_filename)
-                    mesh_path = preview_dir / mesh_filename
-                    imageio.mimsave(str(mesh_path), video_mesh, fps=30)
-                    saved_files.append(str(mesh_path))
-                    logging.info(f"💾 Mesh video saved: {mesh_filename}")
-            
-            # 썸네일: 미리보기 디렉토리에 저장
-            if 'jpg' in formats or video_gs is not None:
-                try:
-                    frame_times = [4, 5, 6, 10]  # seconds
-                    fps = 30  # same as render
-
-                    from PIL import Image
-                    for sec in frame_times:
-                        frame_idx = sec * fps
-                        if video_gs is not None and len(video_gs) > frame_idx:
-                            base_filename = f"{file_prefix}_gs_{sec:03d}s.jpg"
-                            thumbnail_filename = self._get_unique_filename(preview_dir, base_filename)
-                            thumbnail_path = preview_dir / thumbnail_filename
-                            
-                            thumbnail_img = Image.fromarray(video_gs[frame_idx])
-                            thumbnail_img.save(str(thumbnail_path), "JPEG", quality=90)
-                            saved_files.append(str(thumbnail_path))
-                            logging.info(f"💾 Thumbnail saved: {thumbnail_filename}")
-                        else:
-                            logging.warning(f"⚠️ Frame {frame_idx} for {sec}s not available in video_gs")
-                except Exception as e:
-                    logging.warning(f"⚠️ Thumbnail generation failed: {e}")
-                    
-        except Exception as e:
-            logging.error(f"❌ File saving failed: {e}")
-            logging.error(f"   Tried to save to: {object_dir}")
-            raise
-        
-        save_time = time.time() - save_start
-        total_time = time.time() - start_time
-
-        preview_only = [
-            Path(p).name for p in saved_files
-            if Path(p).parent.resolve() == preview_dir.resolve()
-        ]
-        self._write_generation_json(
-            preview_dir,
-            prompt=prompt,
-            context=context or {},
-            seed=seed,
-            glb_path=str(glb_path_saved) if glb_path_saved else None,
-            preview_files=preview_only,
-        )
-        
-        return {
-            'prompt': prompt,
-            'object_name': object_name,
-            'seed': seed,
-            'model_name': self.model_name,
-            'llm_model': llm_model,
-            'run_id': context.get('run_id') or self.run_id,
-            'object_path': context.get('object_path') or context.get('file_identifier'),
-            'generation_time': round(generation_time, 2),
-            'render_time': round(render_time, 2),
-            'save_time': round(save_time, 2),
-            'total_time': round(total_time, 2),
-            'success': True,
-            'saved_files': saved_files,
-            'save_path': str(object_dir),
-            'preview_path': str(preview_dir) if preview_dir != object_dir else None,
-            'timestamp': datetime.now().isoformat()
-        }
+        """서브클래스(Trellis2InferenceCore)가 구현한다."""
+        raise NotImplementedError("_generate_single() 은 백엔드 서브클래스가 구현한다")
 
     def _save_results_to_csv(self) -> None:
         """Save results to CSV file with specified naming format"""

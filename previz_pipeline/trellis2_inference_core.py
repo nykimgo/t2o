@@ -1,24 +1,22 @@
 """TRELLIS.2 inference core (Phase 3) — image-to-3D backend for the t2o pipeline.
 
 Drop-in replacement for :class:`TrellisInferenceCore` (TRELLIS v1, text-to-3D).
-TRELLIS.2 is image-conditioned, so this core inserts a Text→Image (FLUX) bridge
+TRELLIS.2 is image-conditioned, so this core inserts a Text→Image (ERNIE) bridge
 before the 3D stage:
 
-    prompt --(FLUX)--> reference image --(TRELLIS.2)--> MeshWithVoxel (PBR)
+    prompt --(ERNIE)--> reference image --(TRELLIS.2)--> MeshWithVoxel (PBR)
            --> o_voxel.to_glb (PNG) --> GLB  --> [downstream glb_to_usd_native]
 
 Design
 ------
 * Subclasses ``TrellisInferenceCore`` to REUSE all path/naming/manifest/CSV/
   generation-json logic unchanged; only pipeline loading and the per-object
-  generation+export+render are overridden.
+  generation+export are overridden.
 * GLB is exported with ``extension_webp=False`` (PNG textures) so the downstream
   GLB->USD step gets plain .png/.jpg (no EXT_texture_webp). The converter is now
   the native trimesh+pxr path (glb_to_usd_native.py), which also extracts jpg
   textures — PNG/jpg keeps that simple and portable. PBR metallic/roughness maps
   ARE glTF-core and convert fine.
-* HDRI .exr is read via the ``OpenEXR`` package (the installed
-  opencv-python-headless is built with OpenEXR:NO). Render is best-effort.
 
 E2E 검증: previz_pipeline/e2e_test.py 로 확인됨 (TRELLIS2_MIGRATION.md 참고).
 """
@@ -59,26 +57,17 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import numpy as np
 import torch
 from PIL import Image
+from t2i_config import DEFAULT_T2I_MODEL_PATH
 
-import trellis_inference_core as _base_mod
 from trellis_inference_core import TrellisInferenceCore  # base: reuse all helpers
 
-# The base module guards on TRELLIS **v1** availability (its module-level import
-# of trellis.pipelines). In the trellis2 env v1 is absent, so the base's
-# __init__ guard would raise. We supply our own v2 pipeline, so neutralize it.
-_base_mod.TRELLIS_AVAILABLE = True
-
-# The base module sets ATTN_BACKEND=xformers (TRELLIS v1). TRELLIS.2 must use
-# flash_attn (xformers isn't installed in the trellis2 env). Force it BEFORE
-# importing trellis2, whose backend is selected at import time.
+# TRELLIS.2 는 flash_attn 백엔드를 쓴다 (xformers 는 이 env 에 없음).
+# trellis2 의 백엔드는 import 시점에 선택되므로 반드시 import 전에 설정한다.
 os.environ["ATTN_BACKEND"] = "flash_attn"
 os.environ["SPCONV_ALGO"] = "native"
 
 try:
-    import imageio
     from trellis2.pipelines import Trellis2ImageTo3DPipeline
-    from trellis2.utils import render_utils
-    from trellis2.renderers import EnvMap
     import o_voxel
     TRELLIS2_AVAILABLE = True
 except ImportError as e:  # pragma: no cover
@@ -90,37 +79,16 @@ except ImportError as e:  # pragma: no cover
 # server. Absolute paths here used to be pinned to the original host.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Default HDRI for PBR preview render (best-effort only).
-_DEFAULT_HDRI = str(_REPO_ROOT / "trellis2_src/assets/hdri/forest.exr")
 _AABB = [[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]]
 
 
-def _ensure_o_voxel_no_nvdiffrast() -> None:
-    """설치본 o_voxel 이 nvdiffrast 버전이면 patches/ 를 자동 적용한다.
-
-    setup.sh 로 env 를 재구축하면 site-packages 의 o_voxel 이 원본(= nvdiffrast,
-    NVIDIA 비상업 라이선스)으로 되돌아간다. 사람이 ENV_REBUILD_GUIDE §함정 6 을
-    기억해 patch 스크립트를 다시 돌려야 하는 구조는 언젠가 반드시 잊히고, 잊혀도
-    아무 에러 없이 라이선스 위반 상태로 조용히 돌아간다. 그래서 배송 경로 코드가
-    로드 시점에 직접 확인하고, 스크립트(멱등·원본 검증 포함)를 자동 실행한다.
-    """
+def _ensure_o_voxel_commercial_override() -> None:
+    """설치본 o_voxel에 상업 배포용 UV 래스터라이저가 적용됐는지 확인한다."""
     import o_voxel.postprocess as _pp
-    if "uv_raster" in Path(_pp.__file__).read_text(encoding="utf-8"):
-        return  # 이미 패치됨 (정상 상태)
-
-    script = _REPO_ROOT / "patches" / "apply_o_voxel_no_nvdiffrast.sh"
-    logging.warning("⚠️ o_voxel 이 nvdiffrast 원본 상태 (env 재구축?) — 패치 자동 적용")
-    r = subprocess.run(["bash", str(script)], capture_output=True, text=True)
-    if r.returncode != 0:
+    if "from . import uv_raster" not in Path(_pp.__file__).read_text(encoding="utf-8"):
         raise RuntimeError(
-            "o_voxel nvdiffrast 제거 패치 자동 적용 실패 — nvdiffrast(비상업 전용)로는 "
-            f"진행하지 않는다. 수동 실행: {script}\n{r.stdout}\n{r.stderr}")
-
-    import importlib
-    importlib.reload(_pp)
-    if "uv_raster" not in Path(_pp.__file__).read_text(encoding="utf-8"):
-        raise RuntimeError(f"패치 적용 후에도 o_voxel 이 nvdiffrast 상태: {_pp.__file__}")
-    logging.info("✅ o_voxel 패치 자동 적용 완료 (nvdiffrast 제거)")
+            "o_voxel 상업 배포용 override가 적용되지 않았습니다. "
+            "환경 설치 후 patches/install_o_voxel_commercial.sh를 실행하세요.")
 
 
 # CC BY-NC 라 상업 사용 불가 — MIT 인 원저자 모델로 강제한다. 두 모델은 같은
@@ -152,7 +120,7 @@ def _ensure_rembg_commercial(model_path: str) -> None:
             "⚠️ rembg 가 비상업 모델(%s)로 되돌아가 있었음 (모델 재다운로드?) — "
             "%s 를 %s 로 자동 교정", _REMBG_NC, "/".join(fixed), _REMBG_MIT)
 
-# FLUX runs as a subprocess to keep its VRAM lifecycle separate from TRELLIS.2,
+# ERNIE runs as a subprocess to keep its VRAM lifecycle separate from TRELLIS.2,
 # but in the same env as this process (the separate t2i env was folded into
 # trellis2 — ENV_REBUILD_GUIDE.md §6). Override with T2I_PYTHON / T2I_SCRIPT.
 _T2I_PYTHON = os.environ.get("T2I_PYTHON", sys.executable)
@@ -160,36 +128,26 @@ _T2I_SCRIPT = os.environ.get(
     "T2I_SCRIPT", str(_REPO_ROOT / "previz_pipeline" / "text_to_image.py"))
 
 
-def _read_exr_rgb(path: str) -> np.ndarray:
-    """Read an .exr HDRI to an (H,W,3) float32 RGB array via the OpenEXR pkg."""
-    import OpenEXR
-    f = OpenEXR.File(path)
-    return np.asarray(f.channels()["RGB"].pixels, dtype=np.float32)
-
-
 class Trellis2InferenceCore(TrellisInferenceCore):
-    """Image-to-3D core using TRELLIS.2-4B, with a FLUX Text→Image front-end."""
+    """Image-to-3D core using TRELLIS.2-4B, with an ERNIE Text→Image front-end."""
 
     def __init__(
         self,
         model_path: str = str(_REPO_ROOT / "hf_models" / "TRELLIS.2-4B"),
         base_output_dir: str = os.environ.get(
             "TRELLIS_BASE_OUTPUT", str(_REPO_ROOT / "t2o_results")),
-        t2i_model_path: str = str(_REPO_ROOT / "hf_models" / "FLUX.1-schnell"),
-        hdri_path: str = _DEFAULT_HDRI,
+        t2i_model_path: str = DEFAULT_T2I_MODEL_PATH,
         pipeline_type: Optional[str] = None,   # None -> model default '1024_cascade'
     ) -> None:
         if not TRELLIS2_AVAILABLE:
             raise ImportError("TRELLIS.2 modules are not available")
         super().__init__(model_path=model_path, base_output_dir=base_output_dir)
         self.t2i_model_path = t2i_model_path
-        self.hdri_path = hdri_path
         self.pipeline_type = pipeline_type
-        self.envmap = None
 
-    # -- overridden: load TRELLIS.2 + FLUX + envmap (replaces TrellisTextTo3D) --
+    # -- overridden: load TRELLIS.2 + ERNIE (replaces TrellisTextTo3D) --
     def load_pipeline(self) -> None:
-        _ensure_o_voxel_no_nvdiffrast()  # env 재구축 후 패치 유실 자동 복구
+        _ensure_o_voxel_commercial_override()
         logging.info(f"🔄 Loading TRELLIS.2 pipeline from: {self.model_path}")
         src = self.model_path if os.path.exists(self.model_path) else "microsoft/TRELLIS.2-4B"
         if os.path.isdir(src):
@@ -207,28 +165,13 @@ class Trellis2InferenceCore(TrellisInferenceCore):
         else:
             logging.warning("ℹ️ GPU not available")
 
-        # HDRI for PBR preview render (optional).
-        try:
-            self.envmap = EnvMap(torch.tensor(
-                _read_exr_rgb(self.hdri_path), dtype=torch.float32, device="cuda"))
-            logging.info(f"✅ HDRI envmap loaded: {self.hdri_path}")
-        except Exception as e:
-            logging.warning(f"⚠️ HDRI load failed (render will be skipped): {e}")
-            self.envmap = None
-
     def _t2i_generate(self, prompt: str, seed: int, out_path: str) -> Image.Image:
-        """Run FLUX in a subprocess and load the PNG it wrote.
+        """Run ERNIE in the same conda environment and return its RGB PNG.
 
-        Kept out-of-process for VRAM, not for env isolation: FLUX now runs in
-        this same env, and ending the process hands its VRAM back in full. That
-        is what makes the single-card "generate all images, then lift" batch
-        order work.
-
-        VRAM: schnell in bf16 barely fits a 24GB card even with CPU offload
-        (measured ~23.4GB peak on an empty 4090). TRELLIS.2 is already resident
-        here, so sharing the card OOMs. Set ``T2I_GPU`` to hand FLUX its own
-        device; on a single-GPU box leave it unset and the two stages must be
-        split into separate runs instead.
+        The subprocess releases model VRAM on exit. With a single 4090,
+        generate references before loading TRELLIS.2; do not keep both stages
+        resident on that card. T2I_GPU selects a separate physical GPU when
+        TRELLIS.2 is already loaded. Prompt enhancement is enabled by default.
         """
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         cmd = [
@@ -286,7 +229,7 @@ class Trellis2InferenceCore(TrellisInferenceCore):
         asset_label_name = self._resolve_asset_label_name(context, context.get("target_type") or "item")
         file_prefix = self._build_file_prefix(scene_name, shot_name, asset_label_name, seed)
 
-        # --- Stage A: Text -> Image (FLUX) ---
+        # --- Stage A: Text -> Image (ERNIE) ---
         gen_start = time.time()
         ref_path = preview_dir / f"{file_prefix}_ref.png"
         image = self._t2i_generate(prompt, seed, str(ref_path))
@@ -365,22 +308,11 @@ class Trellis2InferenceCore(TrellisInferenceCore):
         logging.info(f"⏱️  [I2O] {object_name}: {i2o_time:.1f}s")
         generation_time = time.time() - gen_start
 
-        # --- Stage C: PBR preview render (best-effort) ---
-        render_start = time.time()
-        video = None
-        # 프리뷰(mp4/jpg)를 실제로 요청했을 때만 렌더한다. 이 게이트가 없으면
-        # --formats glb 로도 120프레임 턴테이블 렌더(객체당 ~41s, 실측)를 그대로
-        # 지불한다. GLB 산출물은 이 렌더와 무관하게 생성되므로 건너뛰어도 안전하다.
-        want_preview = ("mp4" in formats) or ("jpg" in formats)
-        if want_preview and self.envmap is not None:
-            try:
-                video = render_utils.make_pbr_vis_frames(
-                    render_utils.render_video(mesh, envmap=self.envmap))
-            except Exception as e:
-                logging.warning(f"⚠️ PBR render failed (skipping): {e}")
-        render_time = time.time() - render_start
-
-        # --- Stage D: export GLB (PNG textures for portable GLB->USD) + previews ---
+        # --- Stage C: export GLB (PNG textures for portable GLB->USD) ---
+        unsupported_formats = set(formats) - {"glb"}
+        if unsupported_formats:
+            raise ValueError(f"배포 파이프라인은 GLB 출력만 지원합니다: {sorted(unsupported_formats)}")
+        render_time = 0.0
         saved_files: List[str] = []
         glb_path_saved: Optional[Path] = None
         save_start = time.time()
@@ -417,30 +349,11 @@ class Trellis2InferenceCore(TrellisInferenceCore):
                 "backend": "trellis2",
             })
 
-        if "mp4" in formats and video is not None:
-            mp4_name = self._get_unique_filename(preview_dir, f"{file_prefix}_pbr.mp4")
-            mp4_path = preview_dir / mp4_name
-            imageio.mimsave(str(mp4_path), video, fps=15)
-            saved_files.append(str(mp4_path))
-            logging.info(f"💾 PBR video saved: {mp4_name}")
-
-        if "jpg" in formats and video is not None:
-            try:
-                for sec in (2, 4, 6):
-                    idx = sec * 15
-                    if len(video) > idx:
-                        thumb = self._get_unique_filename(preview_dir, f"{file_prefix}_{sec:03d}s.jpg")
-                        Image.fromarray(video[idx]).save(str(preview_dir / thumb), "JPEG", quality=90)
-                        saved_files.append(str(preview_dir / thumb))
-            except Exception as e:
-                logging.warning(f"⚠️ Thumbnail generation failed: {e}")
-
         save_time = time.time() - save_start
         total_time = time.time() - start_time
         logging.info(
             f"⏱️  [객체 합계] {object_name}: {total_time:.1f}s "
-            f"(T2I {t2i_time:.1f}s / I2O {i2o_time:.1f}s / "
-            f"render {render_time:.1f}s / save {save_time:.1f}s)")
+            f"(T2I {t2i_time:.1f}s / I2O {i2o_time:.1f}s / save {save_time:.1f}s)")
 
         preview_only = [Path(p).name for p in saved_files
                         if Path(p).parent.resolve() == preview_dir.resolve()]

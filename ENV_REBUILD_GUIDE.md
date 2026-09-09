@@ -1,4 +1,6 @@
-# TRELLIS.2 + FLUX 단일 env 재구축 가이드 (4090 서버 검증본)
+# TRELLIS.2 환경 재구축 가이드
+
+> **2026-09-08 변경:** 기본 T2I가 ERNIE-Image-Turbo로 전환되었고 `trellis2` 환경에 통합했다. 현재 설치는 [ERNIE_DEFAULT_SETUP.md](docs/ERNIE_DEFAULT_SETUP.md)를 먼저 적용한다. Transformers **5.16.1** 및 TRELLIS 호환 패치 두 개가 필수다. 아래 본문은 기존 FLUX/Transformers 4.56.2 구성의 기록이며, 그중 5.x 금지·T2I 모델/의존성 설정은 새 문서로 대체된다.
 
 > 작성: 2026-07-24 / 대상: conda env `trellis2` 를 **이 서버(RTX 4090 ×4, sm_89)** 또는
 > 동급 서버에 처음부터 다시 만드는 사람(또는 Claude).
@@ -45,7 +47,6 @@
 | sentencepiece | 0.2.2 | FLUX T5 토크나이저 (§6) |
 | pillow | 12.2.0 | 표준 pillow. **Pillow-SIMD 쓰지 마라** (§4) |
 | numpy / protobuf | 2.2.6 / 7.35.1 | |
-| nvdiffrast / nvdiffrec_render | 0.4.0 / 0.0.0 | setup.sh 로 빌드 |
 | o_voxel / flex_gemm / cumesh | 0.0.1 / 1.0.0 / 0.0.1 | 커스텀 CUDA 확장, arch 8.9 로 빌드 |
 | triton | 3.2.0 | |
 | usd-core | 25.8 | 🟠 `--no-deps` 로 추가 (§7) |
@@ -104,12 +105,12 @@ cd <repo>/t2o_pipeline/trellis2_src
 apt-get install -y libjpeg-dev      # 가능하면 선설치
 sed -i 's/sudo //g' setup.sh        # setup.sh 에서 sudo 제거
 
-# flash-attn 은 빼고 실행 (아래 [함정 1])
-. ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
+# flash-attn 은 빼고 실행 (아래 [함정 1]); GLB 생성에 필요한 확장만 설치
+. ./setup.sh --new-env --basic --cumesh --o-voxel --flexgemm
 conda activate trellis2             # 이름이 다르면 conda rename
 
-# [함정 6] o_voxel 의 nvdiffrast 의존성 제거 — 아래 참고
-cd <repo>/t2o_pipeline && ./patches/apply_o_voxel_no_nvdiffrast.sh
+# [함정 6] o_voxel 상업 배포용 최종 파일 적용 — 아래 참고
+cd <repo>/t2o_pipeline && ./patches/install_o_voxel_commercial.sh
 ```
 
 ### 함정 1 — flash-attn: 소스 빌드 대신 prebuilt wheel
@@ -153,31 +154,27 @@ pip install --no-deps opencv-python-headless==4.11.0.86
 pip install transformers==4.56.2    # huggingface-hub 0.36.2 동반
 ```
 
-### 함정 6 — o_voxel 의 nvdiffrast 의존성 제거 (상업화 필수)
-`o_voxel.postprocess.to_glb` 의 텍스처 베이킹이 `nvdiffrast` 를 쓴다. nvdiffrast/nvdiffrec 는
-**NVIDIA Source Code License = 비상업 전용**이라 사업화하려면 배송 경로에 남아 있으면 안 된다.
-이 호출이 GLB 산출 경로의 마지막 nvdiffrast 의존성이라 여기만 걷어내면 된다.
+### 함정 6 — o_voxel 상업 배포용 최종 파일 적용
+검증·배포 경로는 `patches/o_voxel/`에 보관된 순수 torch UV 래스터라이저와
+최종 `postprocess.py`를 사용한다. 환경이나 `o_voxel`을 다시 설치하면 아래 스크립트를
+다시 실행한다.
 
 ```bash
 cd <repo>/t2o_pipeline
-./patches/apply_o_voxel_no_nvdiffrast.sh    # 멱등, 재실행 안전
+./patches/install_o_voxel_commercial.sh
 ```
 
 `trellis2_src/` 가 `.gitignore` 대상이라 수정분이 버전관리에 안 남는다. 그래서 패치를
-`patches/` 에 두고 스크립트로 입히는 구조다.
+완료한 최종 파일을 `patches/` 에 두고 스크립트로 설치본과 벤더본에 복사한다.
 
-**잊어도 안전하다**: `trellis2_inference_core.load_pipeline()` 이 로드 시점에 설치본을
-검사해서 nvdiffrast 원본 상태면 이 스크립트를 자동 실행한다
-(`_ensure_o_voxel_no_nvdiffrast`, 재구축 시뮬레이션으로 검증됨). 자동 적용마저 실패하면
-조용히 nvdiffrast 로 돌지 않고 RuntimeError 로 죽는다. 위 수동 실행은 재구축 직후
-검증 단계를 파이프라인 실행 전에 끝내고 싶을 때만 필요하다.
+`trellis2_inference_core.load_pipeline()`은 로드 시점에 적용 여부를 검사한다.
+적용되지 않은 환경에서는 자동으로 옛 파일을 사용하지 않고 RuntimeError로 중단한다.
 
 대체 구현은 순수 torch(의존성 0 추가)이며 실제 TRELLIS.2 출력으로 검증했다:
 지오메트리에서 구워지는 텍셀 99.7%+ 비트동일, PSNR 69~85 dB, 불일치 지점은 fp64 재계산 결과
 대체 구현이 더 정확하다. 근거·재현 방법은 `experiments/uv_raster_swap/FINDINGS.md`.
 
-> 남은 nvdiffrast 사용처는 프리뷰 렌더(`trellis2/renderers/*`)뿐이고 `want_preview` 로
-> 게이팅돼 있다 — 상업 배포에서는 `--formats` 에 `mp4`/`jpg` 를 넣지 말 것.
+> 배포 파이프라인에서는 프리뷰 렌더 경로를 제거했으며 GLB/USD 출력만 지원한다.
 
 ---
 
@@ -282,7 +279,7 @@ export CUDA_HOME=/usr/local/cuda-12.4
 export PYTHONPATH=<repo>/t2o_pipeline/trellis2_src:$PYTHONPATH
 
 # (1) 확장 + CUDA
-python -c "import torch,o_voxel,flex_gemm,cumesh,nvdiffrast,flash_attn; \
+python -c "import torch,o_voxel,flex_gemm,cumesh,flash_attn; \
   print('CUDA', torch.cuda.is_available(), torch.cuda.get_device_capability(0))"
 #   → CUDA True (8, 9) 여야 함. capability 가 (8,9) 가 아니면 arch 빌드가 틀린 것.
 
@@ -317,7 +314,6 @@ CUDA_VISIBLE_DEVICES=0 python previz_pipeline/text_to_image.py \
 | GLB→USD | `usd_from_gltf` 바이너리 빌드 | **`glb_to_usd_native.py`** (바이너리 불필요) |
 | flash-attn | 소스 빌드 | **prebuilt wheel** (arch 8.9) |
 | HF CLI | `huggingface-cli download` | **`hf download`** |
-| nvdiffrast | 0.3.3 | 0.4.0 |
 | FLUX.1-schnell 검증 | "미검증(dev로만)" | **schnell 실측 검증 완료** |
 
 ---

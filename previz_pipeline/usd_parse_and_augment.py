@@ -825,7 +825,6 @@ def parse_and_augment(
         final_results.append(meta_item)
     
     # 통계 정보 계산
-    augmented_success_count = t2i_prompt_count
     
     # 타입별 통계
     parsed_objects_count = len(objects)

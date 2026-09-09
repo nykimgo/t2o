@@ -35,14 +35,9 @@ MAU 임계값이나 Llama 식 추가 상업 조항은 없다. **제품 크레딧
 
 | 컴포넌트 | 라이선스 | 상태 |
 |---|---|---|
-| nvdiffrast / nvdiffrec | NVIDIA Source Code License (**연구·평가 전용**) | `to_glb` 베이킹에서 제거 — `patches/apply_o_voxel_no_nvdiffrast.sh`, `load_pipeline` 이 자동 재적용. 검증: `experiments/uv_raster_swap/FINDINGS.md` |
 | briaai/RMBG-2.0 | CC BY-NC 4.0 (상업은 Bria 유료계약) | `pipeline.json`/`texturing_pipeline.json` 에서 `ZhengPeng7/BiRefNet`(MIT) 로 교체 — `load_pipeline` 이 자동 재교정. 검증: `experiments/rembg_swap/FINDINGS.md` |
 | FLUX.1-dev | FLUX.1-dev Non-Commercial License | 진단 용도로만 (`T2I_MODEL_PATH` 수동 지정 시). 배송 기본값은 schnell |
 | diff-gaussian-rasterization (3DGS) | INRIA 연구 전용 | TRELLIS **v1** 의존성 — v2 백엔드는 사용하지 않음 |
-
-**프리뷰 렌더 경고**: `trellis2/renderers/*`(턴테이블 mp4/jpg)는 여전히
-nvdiffrast/nvdiffrec 를 쓴다. 상업 배포 구성에서는 `--formats` 에 `mp4`/`jpg` 를
-넣지 말 것 (GLB 산출과 무관, `want_preview` 게이트로 차단됨).
 
 ## 🎛️ edit3d (부분편집) 의존성 — 기술이전 시 추가 확인 사항
 
