@@ -1,0 +1,196 @@
+{
+  "date": "2026-09-09",
+  "kind": "four-seed UI integration and background regression check",
+  "before_version": "0bb27097244e44469405480b847e83d3",
+  "batch_id": "a13b0731389c4b02beff11f8cd02efd8",
+  "asset_id": "576021d4e70d424da0d5ef64e312e55b",
+  "request": {
+    "asset_id": "576021d4e70d424da0d5ef64e312e55b",
+    "version_id": "0bb27097244e44469405480b847e83d3",
+    "prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+    "model": "ernie",
+    "seed": 197861,
+    "rig_type": "static_object"
+  },
+  "caption_probe": {
+    "stage": "caption",
+    "model": "gpt-oss:20b",
+    "device": "CPU",
+    "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+    "cleaned_prompt": "A car",
+    "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+    "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+    "cached": false,
+    "seconds": 52.581
+  },
+  "candidates": [
+    {
+      "version_id": "07e11470d9784dc28f0d989fa37236d3",
+      "seed": 197861,
+      "reference": "/home/sr/previs_proj/.runtime/generation-studio/files/07e11470d9784dc28f0d989fa37236d3/reference.png",
+      "metrics": {
+        "caption": {
+          "stage": "caption",
+          "model": "gpt-oss:20b",
+          "device": "CPU",
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "cleaned_prompt": "A car",
+          "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+          "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+          "cached": true,
+          "seconds": 0
+        },
+        "reference": {
+          "stage": "reference",
+          "device": "NVIDIA GeForce RTX 4090",
+          "physical_gpu": "1",
+          "torch": "2.6.0+cu124",
+          "worker_sha256": "ff37074816ff1e197d8898f430bfcbaf36ba30c71facde432a427b46f8bbf4fd",
+          "model": "/home/sr/previs_proj/t2o_pipeline/hf_models/ERNIE-Image-Turbo",
+          "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+          "revised_prompt": "一张专业汽车摄影照片。画面中央是一辆现代风格的深灰色金属漆轿车，车身线条流线型，展现出极高的工业设计感。车辆以四分之三侧面视角（three-quarter view）停放，完整地呈现于画面中，没有任何遮挡物。车头部分，狭长的LED大灯发出微弱的白光，前保险杠的进气口细节清晰可见。车身侧面，车窗边框带有镀铬装饰，轮毂为多辐条式的黑色铝合金材质。背景是一个纯净、极简的中性浅灰色影棚环境，墙面与地面无缝连接，没有任何杂物或装饰。光线从斜上方均匀洒下，在车身上勾勒出柔和的高光，并在地面上投射出淡淡的、具有真实感的投影。整体构图严谨对称，画面清晰度极高，色彩基调冷峻而高级，展现出一种工业美学。",
+          "body_plan": null,
+          "prompt_enhancer": true,
+          "seed": 197861,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "cleaned_prompt": "A car",
+          "diffusers": "0.39.0",
+          "template_sha256": "bb457cd5c4a6d8fcc6272d6877deef258f9ea6942b3bdcf0b445485865cfc4e9",
+          "seconds": 49.413,
+          "peak_reserved_gib": 15.906
+        }
+      }
+    },
+    {
+      "version_id": "33c777ff44e6418bb5667d23705aa9f3",
+      "seed": 197862,
+      "reference": "/home/sr/previs_proj/.runtime/generation-studio/files/33c777ff44e6418bb5667d23705aa9f3/reference.png",
+      "metrics": {
+        "caption": {
+          "stage": "caption",
+          "model": "gpt-oss:20b",
+          "device": "CPU",
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "cleaned_prompt": "A car",
+          "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+          "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+          "cached": true,
+          "seconds": 0
+        },
+        "reference": {
+          "stage": "reference",
+          "device": "NVIDIA GeForce RTX 4090",
+          "physical_gpu": "1",
+          "torch": "2.6.0+cu124",
+          "worker_sha256": "ff37074816ff1e197d8898f430bfcbaf36ba30c71facde432a427b46f8bbf4fd",
+          "model": "/home/sr/previs_proj/t2o_pipeline/hf_models/ERNIE-Image-Turbo",
+          "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+          "revised_prompt": "这张高品质的汽车摄影图片展示了一辆现代感十足的银灰色电动轿车。汽车作为画面的唯一主体，位于构图的正中心，全车清晰可见且未被任何遮挡。车辆呈四分之三侧面视角（three-quarter view），展现出优雅的流线型车身轮廓。车头部分拥有锐利的LED前大灯组，前格栅线条简洁，车身侧面线条从前翼子板顺滑延伸至车尾，配备了多辐式铝合金轮毂。背景是一个极简主义的中性灰色影棚空间，地面为光滑的浅灰色抛光材质，能够隐约反射出车辆的底部轮廓。光线采用柔和的漫射光，均匀地照亮车身，在金属漆面上形成细腻的高光，并在车身侧面投下淡雅的阴影，增强了物体的立体感。整体画面色调冷峻而纯净，构图严谨对称，呈现出一种工业设计的美感与高端商业摄影的质感。",
+          "body_plan": null,
+          "prompt_enhancer": true,
+          "seed": 197862,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "cleaned_prompt": "A car",
+          "diffusers": "0.39.0",
+          "template_sha256": "bb457cd5c4a6d8fcc6272d6877deef258f9ea6942b3bdcf0b445485865cfc4e9",
+          "seconds": 46.121,
+          "peak_reserved_gib": 15.906
+        }
+      }
+    },
+    {
+      "version_id": "1f8b9e01fcc140e19f4f5b36574e5e4a",
+      "seed": 197863,
+      "reference": "/home/sr/previs_proj/.runtime/generation-studio/files/1f8b9e01fcc140e19f4f5b36574e5e4a/reference.png",
+      "metrics": {
+        "caption": {
+          "stage": "caption",
+          "model": "gpt-oss:20b",
+          "device": "CPU",
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "cleaned_prompt": "A car",
+          "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+          "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+          "cached": true,
+          "seconds": 0
+        },
+        "reference": {
+          "stage": "reference",
+          "device": "NVIDIA GeForce RTX 4090",
+          "physical_gpu": "1",
+          "torch": "2.6.0+cu124",
+          "worker_sha256": "ff37074816ff1e197d8898f430bfcbaf36ba30c71facde432a427b46f8bbf4fd",
+          "model": "/home/sr/previs_proj/t2o_pipeline/hf_models/ERNIE-Image-Turbo",
+          "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+          "revised_prompt": "一张高质量的写实摄影照片，展示了一辆现代豪华跑车的全貌。该车位于画面的正中心，采用三分之二侧面视角（Three-quarter view），使得车头、车身侧面以及部分尾部都清晰可见，没有任何遮挡。车辆拥有流线型的车身设计，外壳涂装为深邃的金属钛银色，在光线下呈现出细腻的金属质感。车头配有锐利的LED大灯组，灯带造型犀利。前轮毂为大尺寸的多辐条合金轮毂，内部透出鲜红色的刹车卡钳。车身侧面线条从前翼子板延伸至车尾，展现出极佳的空气动力学美感。车辆停放在一个纯净、中性的浅灰色无缝影棚背景中，地面带有淡淡的倒影，增强了空间的立体感。光线柔和且分布均匀，在车身的曲面上形成了细腻的高光过渡，突出了车漆的镜面效果。画面构图严谨，比例为1:1，视觉中心完全聚焦在车辆本身，没有任何杂物干扰。",
+          "body_plan": null,
+          "prompt_enhancer": true,
+          "seed": 197863,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "cleaned_prompt": "A car",
+          "diffusers": "0.39.0",
+          "template_sha256": "bb457cd5c4a6d8fcc6272d6877deef258f9ea6942b3bdcf0b445485865cfc4e9",
+          "seconds": 48.631,
+          "peak_reserved_gib": 15.926
+        }
+      }
+    },
+    {
+      "version_id": "3caca609c9004ab08ee5dcc65f68dea2",
+      "seed": 197864,
+      "reference": "/home/sr/previs_proj/.runtime/generation-studio/files/3caca609c9004ab08ee5dcc65f68dea2/reference.png",
+      "metrics": {
+        "caption": {
+          "stage": "caption",
+          "model": "gpt-oss:20b",
+          "device": "CPU",
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "cleaned_prompt": "A car",
+          "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+          "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+          "cached": true,
+          "seconds": 0
+        },
+        "reference": {
+          "stage": "reference",
+          "device": "NVIDIA GeForce RTX 4090",
+          "physical_gpu": "1",
+          "torch": "2.6.0+cu124",
+          "worker_sha256": "ff37074816ff1e197d8898f430bfcbaf36ba30c71facde432a427b46f8bbf4fd",
+          "model": "/home/sr/previs_proj/t2o_pipeline/hf_models/ERNIE-Image-Turbo",
+          "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+          "revised_prompt": "这是一张高质量的汽车产品摄影照片。画面正中心是一辆极具现代感的深灰色金属漆豪华轿跑车，车身线条流线型且富有张力。车辆以标准的三维四分之三侧视角（three-quarter view）呈现，车头朝向画面左前方，完整的车身轮廓和细节均位于画面框架内，没有任何遮挡。车头配备了锐利的LED矩阵式大灯，内部构造清晰可见；前格栅采用黑色蜂窝状设计，中心镶嵌着一个精致的圆形金属徽标。车身侧面展现出宽大的轮拱和贯穿式的腰线，车门把手与车身同色，呈现出哑光质感。车轮为多辐式铝合金轮毂，中心带有品牌标志，内部隐约可见高性能刹车卡钳。车辆停放在一个极简主义的摄影棚内，地面是光滑的浅灰色抛光水泥材质，清晰地反射出车底的轮廓和轮胎阴影。背景是纯净的中性浅灰色无缝背景墙（Cyclorama），没有任何杂物或纹理，营造出一种冷峻、专业的工业设计感。光线采用了柔和的专业影棚布光，光影过渡自然，在车顶和引擎盖上形成了细腻的高光，增强了车身的立体感和金属质感。整张图片构图严谨，清晰度极高，色彩基调沉稳且高级。",
+          "body_plan": null,
+          "prompt_enhancer": true,
+          "seed": 197864,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "cleaned_prompt": "A car",
+          "diffusers": "0.39.0",
+          "template_sha256": "bb457cd5c4a6d8fcc6272d6877deef258f9ea6942b3bdcf0b445485865cfc4e9",
+          "seconds": 48.972,
+          "peak_reserved_gib": 15.906
+        }
+      }
+    }
+  ],
+  "validation": {
+    "candidate_count": 4,
+    "distinct_seeds": 4,
+    "shared_template": true,
+    "all_enhancer_on": true,
+    "all_enhanced_originals_saved": true,
+    "browser_qa": false,
+    "local_image_review": {
+      "reviewed_candidates": 4,
+      "ocean_or_ferry_deck_visible": false,
+      "su_rin_text_visible": false,
+      "neutral_studio_background_visible": true
+    }
+  },
+  "notes": [
+    "Original raw USD scene text is preserved. Main caption rules now run before the unchanged production template.",
+    "A neutral studio background is not an alpha-transparent output.",
+    "No CLIP/FID evaluation or new 3D batch was run."
+  ],
+  "review_url": "http://10.254.62.200:8766/?asset=576021d4e70d424da0d5ef64e312e55b&version=07e11470d9784dc28f0d989fa37236d3&tab=t2i"
+}

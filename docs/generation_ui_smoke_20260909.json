@@ -1,0 +1,241 @@
+{
+  "date": "2026-09-09",
+  "kind": "UI integration smoke test; not benchmark or DCC acceptance",
+  "url": "http://10.254.62.200:8766",
+  "review_url": "http://10.254.62.200:8766/?asset=e7b8e3f33eed492d9516fc2dcd94a2c4&version=fedf0d66d8054ecf871b010196cd4ef0",
+  "gpu": "physical RTX 4090 #1, sequential subprocess stages",
+  "environment": "trellis2",
+  "sample": "seagull",
+  "reference_seed": 42,
+  "mesh_seed": 42,
+  "faces_target": 1000000,
+  "texture_size": 2048,
+  "jobs": {
+    "reference_job": {
+      "action": "reference",
+      "completed": [
+        "reference"
+      ],
+      "created": 1788928481.858069,
+      "ended": 1788928539.6946545,
+      "id": "4fe4aa2df3f34f80bd9ef70abb6a3e03",
+      "kind": "job",
+      "message": "완료",
+      "parent": "e7b8e3f33eed492d9516fc2dcd94a2c4",
+      "stage": "reference",
+      "stage_started": 1788928481.9476037,
+      "started": 1788928481.9304495,
+      "state": "complete",
+      "version": "fbcc2df3c385497a9d37a00863860efb"
+    },
+    "mesh_job": {
+      "action": "mesh",
+      "completed": [
+        "prepare",
+        "mesh",
+        "export"
+      ],
+      "created": 1788928677.8234613,
+      "ended": 1788929055.855509,
+      "id": "02bf7080f365470bbd2d7f2307489054",
+      "kind": "job",
+      "message": "완료",
+      "parent": "e7b8e3f33eed492d9516fc2dcd94a2c4",
+      "stage": "export",
+      "stage_started": 1788928794.9163375,
+      "started": 1788928677.8949926,
+      "state": "complete",
+      "version": "fedf0d66d8054ecf871b010196cd4ef0"
+    },
+    "qwen_job": {
+      "action": "reference",
+      "completed": [
+        "reference"
+      ],
+      "created": 1788928974.423387,
+      "ended": 1788929106.6601465,
+      "id": "5dad8e5de62b4aa4bf464a97977d8d33",
+      "kind": "job",
+      "message": "완료",
+      "parent": "e7b8e3f33eed492d9516fc2dcd94a2c4",
+      "stage": "reference",
+      "stage_started": 1788929055.94887,
+      "started": 1788929055.928901,
+      "state": "complete",
+      "version": "be7fe5518a7d4adc9f9260664406116a"
+    }
+  },
+  "versions": {
+    "reference_version": {
+      "approved": false,
+      "base_version": "76841285b95449a3a1a646c8a62384ee",
+      "created": 1788928481.8470175,
+      "faces": 1000000,
+      "id": "fbcc2df3c385497a9d37a00863860efb",
+      "label": "새 참조 이미지",
+      "media": {
+        "reference": "/api/versions/fbcc2df3c385497a9d37a00863860efb/files/reference"
+      },
+      "metrics": {
+        "reference": {
+          "body_plan": "bird",
+          "peak_reserved_gib": 15.906,
+          "prompt_enhancer": true,
+          "prompt_used": "seagull, with wings fully spread symmetrically, standing, neutral background, single object, full body in frame, A seagull with white plumage, gray wings and a yellow beak., three-quarter view",
+          "revised_prompt": "一张高清写实摄影图片。画面中心是一只全身洁白的海鸥，它正稳稳地站立在一个极简的浅灰色平面上。这只海鸥的双翼完全水平向两侧展开，呈现出完美的对称姿态，翼尖的羽毛清晰可见。海鸥的身体呈现出自然的三分之二侧面视角，展现出优美的轮廓线条。它的喙部呈鲜艳的亮黄色，尖端略微弯曲，质感坚硬。海鸥的羽毛洁白如雪，在光线下呈现出细腻的质感和微小的纹理，翅膀边缘的深灰色羽毛与白色的躯干形成鲜明对比。海鸥的双脚是浅灰色的，稳稳地抓在平面上。背景是纯净且均匀的中性浅灰色，没有任何杂物，营造出一种极简主义的视觉效果。光线均匀且柔和，从斜上方照射，在海鸥下方投射出淡淡的阴影，增强了物体的立体感。画面构图居中，海鸥的全身完整地出现在1024x1024的正方形画幅内，整体风格干净、专业且充满艺术感。",
+          "seconds": 53.609,
+          "seed": 42,
+          "stage": "reference"
+        }
+      },
+      "model": "ernie",
+      "object_name": "seagull",
+      "parent": "e7b8e3f33eed492d9516fc2dcd94a2c4",
+      "prompt": "A seagull with white plumage, gray wings and a yellow beak.",
+      "rig_type": "bird",
+      "seed": 42,
+      "source": "디자이너 작업",
+      "source_object": null,
+      "state": "complete",
+      "texture": 2048,
+      "warning": ""
+    },
+    "mesh_version": {
+      "approved": false,
+      "base_version": "fbcc2df3c385497a9d37a00863860efb",
+      "created": 1788928677.8003159,
+      "faces": 1000000,
+      "id": "fedf0d66d8054ecf871b010196cd4ef0",
+      "label": "3D 재생성",
+      "media": {
+        "cutout": "/api/versions/fedf0d66d8054ecf871b010196cd4ef0/files/cutout",
+        "glb": "/api/versions/fedf0d66d8054ecf871b010196cd4ef0/files/glb",
+        "prepared": "/api/versions/fedf0d66d8054ecf871b010196cd4ef0/files/prepared",
+        "reference": "/api/versions/fedf0d66d8054ecf871b010196cd4ef0/files/reference"
+      },
+      "metrics": {
+        "export": {
+          "device": "NVIDIA GeForce RTX 4090",
+          "faces_target": 1000000,
+          "peak_reserved_gib": 1.957,
+          "physical_gpu": "1",
+          "seconds": 258.72,
+          "stage": "export",
+          "texture_size": 2048,
+          "torch": "2.6.0+cu124",
+          "worker_sha256": "336ecc6abfa9f1e7aa8140ce917479048b7e3427bbf70c3375b9eb34098cdf7f"
+        },
+        "mesh": {
+          "actual_seed": 42,
+          "device": "NVIDIA GeForce RTX 4090",
+          "model": "/home/sr/previs_proj/t2o_pipeline/hf_models/TRELLIS.2-4B",
+          "peak_reserved_gib": 2.719,
+          "physical_gpu": "1",
+          "pipeline_config_sha256": "0e4a4b8698f985224c82d7a91ee54366419cf5c22ede792717def44db1a2ebff",
+          "pipeline_type": "1024_cascade",
+          "seconds": 105.719,
+          "stage": "mesh",
+          "thickness_ratio": 0.49651002883911133,
+          "torch": "2.6.0+cu124",
+          "warning": "",
+          "worker_sha256": "336ecc6abfa9f1e7aa8140ce917479048b7e3427bbf70c3375b9eb34098cdf7f"
+        },
+        "prepare": {
+          "device": "NVIDIA GeForce RTX 4090",
+          "peak_reserved_gib": 3.549,
+          "physical_gpu": "1",
+          "rembg": "ZhengPeng7/BiRefNet",
+          "seconds": 5.543,
+          "stage": "prepare",
+          "torch": "2.6.0+cu124",
+          "worker_sha256": "336ecc6abfa9f1e7aa8140ce917479048b7e3427bbf70c3375b9eb34098cdf7f"
+        }
+      },
+      "model": "ernie",
+      "object_name": "seagull",
+      "parent": "e7b8e3f33eed492d9516fc2dcd94a2c4",
+      "prompt": "A seagull with white plumage, gray wings and a yellow beak.",
+      "rig_type": "bird",
+      "seed": 42,
+      "source": "디자이너 작업",
+      "source_object": null,
+      "state": "complete",
+      "texture": 2048,
+      "warning": ""
+    },
+    "qwen_version": {
+      "approved": false,
+      "base_version": "fbcc2df3c385497a9d37a00863860efb",
+      "created": 1788928974.4149024,
+      "faces": 1000000,
+      "id": "be7fe5518a7d4adc9f9260664406116a",
+      "label": "새 참조 이미지",
+      "media": {
+        "reference": "/api/versions/be7fe5518a7d4adc9f9260664406116a/files/reference"
+      },
+      "metrics": {
+        "reference": {
+          "body_plan": "bird",
+          "configuration": {
+            "cpu_threads": 8,
+            "dtype": "bfloat16",
+            "gpu_count": 1,
+            "offload": "quantized transformer GPU resident; text encoder CPU BF16",
+            "prompt_enhancer": false,
+            "quantization": "bitsandbytes INT8",
+            "resolution": [
+              1024,
+              1024
+            ],
+            "scheduler_shift": 3.0,
+            "scheduler_shift_terminal": null,
+            "steps": 8,
+            "true_cfg_scale": 1.0
+          },
+          "device": "NVIDIA GeForce RTX 4090",
+          "diffusers": "0.39.0",
+          "peak_reserved_gib": 20.922,
+          "physical_gpu": "1",
+          "prompt_enhancer": false,
+          "prompt_used": "seagull, with wings fully spread symmetrically, standing, neutral background, single object, full body in frame, A seagull with white plumage, gray wings and a yellow beak., three-quarter view",
+          "revised_prompt": null,
+          "seconds": 47.344,
+          "seed": 42,
+          "stage": "reference",
+          "template_sha256": "bb457cd5c4a6d8fcc6272d6877deef258f9ea6942b3bdcf0b445485865cfc4e9",
+          "torch": "2.6.0+cu124",
+          "worker_sha256": "336ecc6abfa9f1e7aa8140ce917479048b7e3427bbf70c3375b9eb34098cdf7f"
+        }
+      },
+      "model": "qwen_int8",
+      "object_name": "seagull",
+      "parent": "e7b8e3f33eed492d9516fc2dcd94a2c4",
+      "prompt": "A seagull with white plumage, gray wings and a yellow beak.",
+      "rig_type": "bird",
+      "seed": 42,
+      "source": "디자이너 작업",
+      "source_object": null,
+      "state": "complete",
+      "texture": 2048,
+      "warning": ""
+    }
+  },
+  "validation": {
+    "http_routes": 13,
+    "restart_records_preserved": true,
+    "glb_load": true,
+    "glb_faces": 991004,
+    "glb_bytes": 43666800,
+    "glb_sha256": "128a423c8acd10c0745a9270d96f1e4178d3a20c65943c266a577fe74f06eadf",
+    "zip_download": true,
+    "browser_qa": false,
+    "windows_dcc_test": false,
+    "clip_fid_evaluation": false
+  },
+  "notes": [
+    "Single sample; not a latency guarantee.",
+    "Stage timers include model loading within the worker.",
+    "PyTorch peak reserved excludes external CUDA allocators.",
+    "Main USD CLI residency scheduling was not changed."
+  ]
+}

@@ -1,0 +1,866 @@
+[
+  {
+    "model": "ernie",
+    "request": {
+      "asset_id": "576021d4e70d424da0d5ef64e312e55b",
+      "version_id": "07e11470d9784dc28f0d989fa37236d3",
+      "prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+      "model": "ernie",
+      "count": 2,
+      "seed_mode": "random",
+      "seed": null
+    },
+    "response": {
+      "batch_id": "1e1bf64945da4b108e5fbd5c0ae2da1b",
+      "count": 2,
+      "jobs": [
+        {
+          "action": "reference",
+          "batch_execution": true,
+          "batch_id": "1e1bf64945da4b108e5fbd5c0ae2da1b",
+          "candidate_count": 2,
+          "candidate_index": 1,
+          "completed": [],
+          "created": 1788932736.6450515,
+          "id": "48b120807a1748aaafec8e5c75cca260",
+          "kind": "job",
+          "message": "대기 중",
+          "parent": "576021d4e70d424da0d5ef64e312e55b",
+          "stage": null,
+          "state": "queued",
+          "version": "5c9a9d38ca474cb890fbb84873bfa284"
+        },
+        {
+          "action": "reference",
+          "batch_execution": true,
+          "batch_id": "1e1bf64945da4b108e5fbd5c0ae2da1b",
+          "candidate_count": 2,
+          "candidate_index": 2,
+          "completed": [],
+          "created": 1788932736.662576,
+          "id": "615c04a3652040718ac333f519f72a59",
+          "kind": "job",
+          "message": "대기 중",
+          "parent": "576021d4e70d424da0d5ef64e312e55b",
+          "stage": null,
+          "state": "queued",
+          "version": "2d9a3dc6d9244e369ad2890b8b7aacc5"
+        }
+      ],
+      "seeds": [
+        1049150887,
+        1049150888
+      ]
+    },
+    "observed": [
+      {
+        "state": "queued",
+        "phase": null,
+        "message": null,
+        "completed": null
+      },
+      {
+        "state": "running",
+        "phase": "load",
+        "message": "모델 로딩",
+        "completed": null
+      },
+      {
+        "state": "running",
+        "phase": "enhance",
+        "message": "프롬프트 보강",
+        "completed": null
+      },
+      {
+        "state": "running",
+        "phase": "encode",
+        "message": "텍스트 인코딩",
+        "completed": null
+      },
+      {
+        "state": "running",
+        "phase": "generate",
+        "message": "2장 함께 생성 중 · 전체 2장",
+        "completed": 0
+      },
+      {
+        "state": "running",
+        "phase": "save",
+        "message": "완료",
+        "completed": 2
+      },
+      {
+        "state": "complete",
+        "phase": "save",
+        "message": "완료",
+        "completed": 2
+      }
+    ],
+    "batch": {
+      "attempt": 1,
+      "attempts": [],
+      "count": 2,
+      "created": 1788932736.6711872,
+      "ended": 1788932802.9213524,
+      "id": "1e1bf64945da4b108e5fbd5c0ae2da1b",
+      "jobs": [
+        "48b120807a1748aaafec8e5c75cca260",
+        "615c04a3652040718ac333f519f72a59"
+      ],
+      "kind": "batch",
+      "parent": "576021d4e70d424da0d5ef64e312e55b",
+      "pe_seed": 1049150887,
+      "progress": {
+        "attempt": 1,
+        "chunk_size": 2,
+        "completed": 2,
+        "count": 2,
+        "ended": 1788932802.9208844,
+        "message": "완료",
+        "phases": [
+          {
+            "ended": 1788932737.9420996,
+            "key": "startup",
+            "label": "실행 준비",
+            "seconds": 1.1533813001587987,
+            "shared": true,
+            "started": 1788932736.788714,
+            "state": "complete"
+          },
+          {
+            "cached": true,
+            "ended": 1788932737.9447267,
+            "key": "caption",
+            "label": "외형 정제",
+            "seconds": 0.002323986031115055,
+            "shared": true,
+            "started": 1788932737.9424005,
+            "state": "complete"
+          },
+          {
+            "ended": 1788932745.6959722,
+            "key": "load",
+            "label": "모델 로딩",
+            "seconds": 7.751143188215792,
+            "shared": true,
+            "started": 1788932737.944826,
+            "state": "complete"
+          },
+          {
+            "ended": 1788932752.7620971,
+            "key": "enhance",
+            "label": "프롬프트 보강",
+            "seconds": 7.065675562713295,
+            "shared": true,
+            "started": 1788932745.6964188,
+            "state": "complete"
+          },
+          {
+            "ended": 1788932760.2584717,
+            "key": "encode",
+            "label": "텍스트 인코딩",
+            "seconds": 7.496113814879209,
+            "shared": true,
+            "started": 1788932752.7623546,
+            "state": "complete"
+          },
+          {
+            "count": 2,
+            "ended": 1788932798.8695726,
+            "key": "generate",
+            "label": "2장 함께 생성 중 · 전체 2장",
+            "seconds": 38.61038700770587,
+            "seeds": [
+              1049150887,
+              1049150888
+            ],
+            "shared": false,
+            "started": 1788932760.2591815,
+            "state": "complete",
+            "step": 8,
+            "steps": 8
+          },
+          {
+            "count": 2,
+            "ended": 1788932800.0277925,
+            "key": "save",
+            "label": "이미지 저장",
+            "seconds": 1.1577057680115104,
+            "seeds": [
+              1049150887,
+              1049150888
+            ],
+            "shared": false,
+            "started": 1788932798.8700833,
+            "state": "complete"
+          }
+        ],
+        "started": 1788932736.788507,
+        "state": "complete",
+        "updated": 1788932800.0293045
+      },
+      "seed_mode": "random",
+      "seeds": [
+        1049150887,
+        1049150888
+      ],
+      "server_time": 1788932802.9510694,
+      "shared": {
+        "body_plan": null,
+        "caption": {
+          "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+          "cached": true,
+          "cleaned_prompt": "A car",
+          "device": "CPU",
+          "model": "gpt-oss:20b",
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+          "seconds": 0,
+          "stage": "caption"
+        },
+        "pe_seed": 1049150887,
+        "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+        "revised_prompt": "一张高质量的汽车产品摄影照片。画面中心是一辆设计前卫、线条流畅的现代化银灰色豪华电动轿车。汽车以三分之二侧面视角（three-quarter view）停放，车头朝向画面的左前方，整车完整地呈现在 1:1 的正方形画幅中，车身各部位均未被遮挡（unoccluded）。车辆的前脸配有锐利的 LED 矩阵大灯和隐藏式的进气格栅，车身侧面线条从前翼子板延伸至尾部，展现出极佳的空气动力学造型，配备了大尺寸的多辐式铝合金轮毂。背景为极简主义的中性灰色摄影棚场景，地面是平整且带有微弱反光的灰色抛光混凝土地板，倒映出车辆模糊的轮廓。光线柔和且分布均匀，从上方和侧面照射，在车身上形成细腻的金属质感高光，并在地面投下淡淡的阴影。整体画面风格干净、专业且具有高端工业美学感，构图严谨，视觉焦点完全集中在中心的汽车主体上。"
+      },
+      "started": 1788932736.7202883,
+      "state": "complete"
+    },
+    "versions": [
+      {
+        "approved": false,
+        "base_version": "07e11470d9784dc28f0d989fa37236d3",
+        "batch_id": "1e1bf64945da4b108e5fbd5c0ae2da1b",
+        "candidate_count": 2,
+        "candidate_index": 2,
+        "created": 1788932736.6548805,
+        "faces": 1000000,
+        "id": "2d9a3dc6d9244e369ad2890b8b7aacc5",
+        "label": "이미지 후보 2/2",
+        "media": {
+          "reference": "/api/versions/2d9a3dc6d9244e369ad2890b8b7aacc5/files/reference"
+        },
+        "metrics": {
+          "caption": {
+            "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+            "cached": true,
+            "cleaned_prompt": "A car",
+            "device": "CPU",
+            "model": "gpt-oss:20b",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+            "seconds": 0,
+            "stage": "caption"
+          },
+          "reference": {
+            "batch_id": "1e1bf64945da4b108e5fbd5c0ae2da1b",
+            "body_plan": null,
+            "cleaned_prompt": "A car",
+            "configuration": {
+              "guidance_scale": 1.0,
+              "model": "/home/sr/previs_proj/t2o_pipeline/hf_models/ERNIE-Image-Turbo",
+              "prompt_enhancer": true,
+              "resolution": [
+                1024,
+                1024
+              ],
+              "steps": 8
+            },
+            "pe_seed": 1049150887,
+            "peak_allocated_gib": 16.557674884796143,
+            "peak_reserved_gib": 16.666015625,
+            "prompt_enhancer": true,
+            "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "revised_prompt": "一张高质量的汽车产品摄影照片。画面中心是一辆设计前卫、线条流畅的现代化银灰色豪华电动轿车。汽车以三分之二侧面视角（three-quarter view）停放，车头朝向画面的左前方，整车完整地呈现在 1:1 的正方形画幅中，车身各部位均未被遮挡（unoccluded）。车辆的前脸配有锐利的 LED 矩阵大灯和隐藏式的进气格栅，车身侧面线条从前翼子板延伸至尾部，展现出极佳的空气动力学造型，配备了大尺寸的多辐式铝合金轮毂。背景为极简主义的中性灰色摄影棚场景，地面是平整且带有微弱反光的灰色抛光混凝土地板，倒映出车辆模糊的轮廓。光线柔和且分布均匀，从上方和侧面照射，在车身上形成细腻的金属质感高光，并在地面投下淡淡的阴影。整体画面风格干净、专业且具有高端工业美学感，构图严谨，视觉焦点完全集中在中心的汽车主体上。",
+            "seed": 1049150888,
+            "shared_prompt": true
+          }
+        },
+        "model": "ernie",
+        "object_name": "car",
+        "parent": "576021d4e70d424da0d5ef64e312e55b",
+        "prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+        "prompt_trace": {
+          "cleaned_prompt": "A car",
+          "enhanced_prompt": "一张高质量的汽车产品摄影照片。画面中心是一辆设计前卫、线条流畅的现代化银灰色豪华电动轿车。汽车以三分之二侧面视角（three-quarter view）停放，车头朝向画面的左前方，整车完整地呈现在 1:1 的正方形画幅中，车身各部位均未被遮挡（unoccluded）。车辆的前脸配有锐利的 LED 矩阵大灯和隐藏式的进气格栅，车身侧面线条从前翼子板延伸至尾部，展现出极佳的空气动力学造型，配备了大尺寸的多辐式铝合金轮毂。背景为极简主义的中性灰色摄影棚场景，地面是平整且带有微弱反光的灰色抛光混凝土地板，倒映出车辆模糊的轮廓。光线柔和且分布均匀，从上方和侧面照射，在车身上形成细腻的金属质感高光，并在地面投下淡淡的阴影。整体画面风格干净、专业且具有高端工业美学感，构图严谨，视觉焦点完全集中在中心的汽车主体上。",
+          "enhancer": true,
+          "model": "ernie",
+          "pe_seed": 1049150887,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "seed": 1049150888,
+          "shared_prompt": true,
+          "source_version": "2d9a3dc6d9244e369ad2890b8b7aacc5",
+          "template_prompt": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view"
+        },
+        "rig_type": "static_object",
+        "seed": 1049150888,
+        "source": "디자이너 작업",
+        "source_object": null,
+        "state": "complete",
+        "texture": 2048,
+        "warning": null
+      },
+      {
+        "approved": false,
+        "base_version": "07e11470d9784dc28f0d989fa37236d3",
+        "batch_id": "1e1bf64945da4b108e5fbd5c0ae2da1b",
+        "candidate_count": 2,
+        "candidate_index": 1,
+        "created": 1788932736.6339164,
+        "faces": 1000000,
+        "id": "5c9a9d38ca474cb890fbb84873bfa284",
+        "label": "이미지 후보 1/2",
+        "media": {
+          "reference": "/api/versions/5c9a9d38ca474cb890fbb84873bfa284/files/reference"
+        },
+        "metrics": {
+          "caption": {
+            "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+            "cached": true,
+            "cleaned_prompt": "A car",
+            "device": "CPU",
+            "model": "gpt-oss:20b",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+            "seconds": 0,
+            "stage": "caption"
+          },
+          "reference": {
+            "batch_id": "1e1bf64945da4b108e5fbd5c0ae2da1b",
+            "body_plan": null,
+            "cleaned_prompt": "A car",
+            "configuration": {
+              "guidance_scale": 1.0,
+              "model": "/home/sr/previs_proj/t2o_pipeline/hf_models/ERNIE-Image-Turbo",
+              "prompt_enhancer": true,
+              "resolution": [
+                1024,
+                1024
+              ],
+              "steps": 8
+            },
+            "pe_seed": 1049150887,
+            "peak_allocated_gib": 16.557674884796143,
+            "peak_reserved_gib": 16.666015625,
+            "prompt_enhancer": true,
+            "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "revised_prompt": "一张高质量的汽车产品摄影照片。画面中心是一辆设计前卫、线条流畅的现代化银灰色豪华电动轿车。汽车以三分之二侧面视角（three-quarter view）停放，车头朝向画面的左前方，整车完整地呈现在 1:1 的正方形画幅中，车身各部位均未被遮挡（unoccluded）。车辆的前脸配有锐利的 LED 矩阵大灯和隐藏式的进气格栅，车身侧面线条从前翼子板延伸至尾部，展现出极佳的空气动力学造型，配备了大尺寸的多辐式铝合金轮毂。背景为极简主义的中性灰色摄影棚场景，地面是平整且带有微弱反光的灰色抛光混凝土地板，倒映出车辆模糊的轮廓。光线柔和且分布均匀，从上方和侧面照射，在车身上形成细腻的金属质感高光，并在地面投下淡淡的阴影。整体画面风格干净、专业且具有高端工业美学感，构图严谨，视觉焦点完全集中在中心的汽车主体上。",
+            "seed": 1049150887,
+            "shared_prompt": true
+          }
+        },
+        "model": "ernie",
+        "object_name": "car",
+        "parent": "576021d4e70d424da0d5ef64e312e55b",
+        "prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+        "prompt_trace": {
+          "cleaned_prompt": "A car",
+          "enhanced_prompt": "一张高质量的汽车产品摄影照片。画面中心是一辆设计前卫、线条流畅的现代化银灰色豪华电动轿车。汽车以三分之二侧面视角（three-quarter view）停放，车头朝向画面的左前方，整车完整地呈现在 1:1 的正方形画幅中，车身各部位均未被遮挡（unoccluded）。车辆的前脸配有锐利的 LED 矩阵大灯和隐藏式的进气格栅，车身侧面线条从前翼子板延伸至尾部，展现出极佳的空气动力学造型，配备了大尺寸的多辐式铝合金轮毂。背景为极简主义的中性灰色摄影棚场景，地面是平整且带有微弱反光的灰色抛光混凝土地板，倒映出车辆模糊的轮廓。光线柔和且分布均匀，从上方和侧面照射，在车身上形成细腻的金属质感高光，并在地面投下淡淡的阴影。整体画面风格干净、专业且具有高端工业美学感，构图严谨，视觉焦点完全集中在中心的汽车主体上。",
+          "enhancer": true,
+          "model": "ernie",
+          "pe_seed": 1049150887,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "seed": 1049150887,
+          "shared_prompt": true,
+          "source_version": "5c9a9d38ca474cb890fbb84873bfa284",
+          "template_prompt": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view"
+        },
+        "rig_type": "static_object",
+        "seed": 1049150887,
+        "source": "디자이너 작업",
+        "source_object": null,
+        "state": "complete",
+        "texture": 2048,
+        "warning": null
+      }
+    ],
+    "review_url": "http://10.254.62.200:8766/?asset=576021d4e70d424da0d5ef64e312e55b&version=5c9a9d38ca474cb890fbb84873bfa284&tab=t2i"
+  },
+  {
+    "model": "qwen_int8",
+    "request": {
+      "asset_id": "576021d4e70d424da0d5ef64e312e55b",
+      "version_id": "07e11470d9784dc28f0d989fa37236d3",
+      "prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+      "model": "qwen_int8",
+      "count": 3,
+      "seed_mode": "manual",
+      "seed": 197861
+    },
+    "response": {
+      "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+      "count": 3,
+      "jobs": [
+        {
+          "action": "reference",
+          "batch_execution": true,
+          "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+          "candidate_count": 3,
+          "candidate_index": 1,
+          "completed": [],
+          "created": 1788932802.9960325,
+          "id": "726981c2ab63462b8bda7e9ed9f56511",
+          "kind": "job",
+          "message": "대기 중",
+          "parent": "576021d4e70d424da0d5ef64e312e55b",
+          "stage": null,
+          "state": "queued",
+          "version": "312d8f4aea9e40a28c7e2602bc03b77e"
+        },
+        {
+          "action": "reference",
+          "batch_execution": true,
+          "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+          "candidate_count": 3,
+          "candidate_index": 2,
+          "completed": [],
+          "created": 1788932803.019094,
+          "id": "b35720afeb424da6a6ee823f10c54802",
+          "kind": "job",
+          "message": "대기 중",
+          "parent": "576021d4e70d424da0d5ef64e312e55b",
+          "stage": null,
+          "state": "queued",
+          "version": "fb4544e092d64167b79acdd9fff53f0d"
+        },
+        {
+          "action": "reference",
+          "batch_execution": true,
+          "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+          "candidate_count": 3,
+          "candidate_index": 3,
+          "completed": [],
+          "created": 1788932803.037164,
+          "id": "0a5458801c8f4c5ab3eb53c6d7a98a53",
+          "kind": "job",
+          "message": "대기 중",
+          "parent": "576021d4e70d424da0d5ef64e312e55b",
+          "stage": null,
+          "state": "queued",
+          "version": "758c670053544e5fb7a12721af6fb73e"
+        }
+      ],
+      "seeds": [
+        197861,
+        197862,
+        197863
+      ]
+    },
+    "observed": [
+      {
+        "state": "queued",
+        "phase": null,
+        "message": null,
+        "completed": null
+      },
+      {
+        "state": "running",
+        "phase": "load",
+        "message": "모델 로딩",
+        "completed": null
+      },
+      {
+        "state": "running",
+        "phase": "encode",
+        "message": "텍스트 인코딩",
+        "completed": null
+      },
+      {
+        "state": "running",
+        "phase": "generate",
+        "message": "3장 함께 생성 중 · 전체 3장",
+        "completed": 0
+      },
+      {
+        "state": "running",
+        "phase": "save",
+        "message": "이미지 저장",
+        "completed": 0
+      },
+      {
+        "state": "complete",
+        "phase": "save",
+        "message": "완료",
+        "completed": 3
+      }
+    ],
+    "batch": {
+      "attempt": 1,
+      "attempts": [],
+      "count": 3,
+      "created": 1788932803.045322,
+      "ended": 1788932865.4071748,
+      "id": "2d83c59cbc0743faa6a2edc91318d4e4",
+      "jobs": [
+        "726981c2ab63462b8bda7e9ed9f56511",
+        "b35720afeb424da6a6ee823f10c54802",
+        "0a5458801c8f4c5ab3eb53c6d7a98a53"
+      ],
+      "kind": "batch",
+      "parent": "576021d4e70d424da0d5ef64e312e55b",
+      "pe_seed": 197861,
+      "progress": {
+        "attempt": 1,
+        "chunk_size": 3,
+        "completed": 3,
+        "count": 3,
+        "ended": 1788932865.4066877,
+        "message": "완료",
+        "phases": [
+          {
+            "ended": 1788932804.3860607,
+            "key": "startup",
+            "label": "실행 준비",
+            "seconds": 1.1896768468432128,
+            "shared": true,
+            "started": 1788932803.1963809,
+            "state": "complete"
+          },
+          {
+            "cached": true,
+            "ended": 1788932804.387427,
+            "key": "caption",
+            "label": "외형 정제",
+            "seconds": 0.0010924790985882282,
+            "shared": true,
+            "started": 1788932804.3863273,
+            "state": "complete"
+          },
+          {
+            "ended": 1788932828.0722158,
+            "key": "load",
+            "label": "모델 로딩",
+            "seconds": 23.684673287905753,
+            "shared": true,
+            "started": 1788932804.3875382,
+            "state": "complete"
+          },
+          {
+            "ended": 1788932828.0729685,
+            "key": "enhance",
+            "label": "프롬프트 보강",
+            "seconds": 0.00024027517065405846,
+            "shared": true,
+            "skipped": true,
+            "started": 1788932828.072726,
+            "state": "complete"
+          },
+          {
+            "ended": 1788932829.1590164,
+            "key": "encode",
+            "label": "텍스트 인코딩",
+            "seconds": 1.085923400707543,
+            "shared": true,
+            "started": 1788932828.073089,
+            "state": "complete"
+          },
+          {
+            "count": 3,
+            "ended": 1788932861.1879444,
+            "key": "generate",
+            "label": "3장 함께 생성 중 · 전체 3장",
+            "seconds": 32.026964163873345,
+            "seeds": [
+              197861,
+              197862,
+              197863
+            ],
+            "shared": false,
+            "started": 1788932829.1609726,
+            "state": "complete",
+            "step": 8,
+            "steps": 8
+          },
+          {
+            "count": 3,
+            "ended": 1788932862.878084,
+            "key": "save",
+            "label": "이미지 저장",
+            "seconds": 1.6894818958826363,
+            "seeds": [
+              197861,
+              197862,
+              197863
+            ],
+            "shared": false,
+            "started": 1788932861.1885989,
+            "state": "complete"
+          }
+        ],
+        "started": 1788932803.1962106,
+        "state": "complete",
+        "updated": 1788932862.8785532
+      },
+      "seed_mode": "manual",
+      "seeds": [
+        197861,
+        197862,
+        197863
+      ],
+      "server_time": 1788932867.3334606,
+      "shared": {
+        "body_plan": null,
+        "caption": {
+          "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+          "cached": true,
+          "cleaned_prompt": "A car",
+          "device": "CPU",
+          "model": "gpt-oss:20b",
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+          "seconds": 0,
+          "stage": "caption"
+        },
+        "pe_seed": 197861,
+        "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+        "revised_prompt": null
+      },
+      "started": 1788932803.1079423,
+      "state": "complete"
+    },
+    "versions": [
+      {
+        "approved": false,
+        "base_version": "07e11470d9784dc28f0d989fa37236d3",
+        "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+        "candidate_count": 3,
+        "candidate_index": 3,
+        "created": 1788932803.0281618,
+        "faces": 1000000,
+        "id": "758c670053544e5fb7a12721af6fb73e",
+        "label": "이미지 후보 3/3",
+        "media": {
+          "reference": "/api/versions/758c670053544e5fb7a12721af6fb73e/files/reference"
+        },
+        "metrics": {
+          "caption": {
+            "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+            "cached": true,
+            "cleaned_prompt": "A car",
+            "device": "CPU",
+            "model": "gpt-oss:20b",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+            "seconds": 0,
+            "stage": "caption"
+          },
+          "reference": {
+            "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+            "body_plan": null,
+            "cleaned_prompt": "A car",
+            "configuration": {
+              "cpu_threads": 8,
+              "dtype": "bfloat16",
+              "gpu_count": 1,
+              "offload": "quantized transformer GPU resident; text encoder CPU BF16",
+              "prompt_enhancer": false,
+              "quantization": "bitsandbytes INT8",
+              "resolution": [
+                1024,
+                1024
+              ],
+              "scheduler_shift": 3.0,
+              "scheduler_shift_terminal": null,
+              "steps": 8,
+              "true_cfg_scale": 1.0
+            },
+            "pe_seed": 197861,
+            "peak_allocated_gib": 21.917927265167236,
+            "peak_reserved_gib": 22.23828125,
+            "prompt_enhancer": false,
+            "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "revised_prompt": null,
+            "seed": 197863,
+            "shared_prompt": true
+          }
+        },
+        "model": "qwen_int8",
+        "object_name": "car",
+        "parent": "576021d4e70d424da0d5ef64e312e55b",
+        "prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+        "prompt_trace": {
+          "cleaned_prompt": "A car",
+          "enhanced_prompt": null,
+          "enhancer": false,
+          "model": "qwen_int8",
+          "pe_seed": 197861,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "seed": 197863,
+          "shared_prompt": true,
+          "source_version": "758c670053544e5fb7a12721af6fb73e",
+          "template_prompt": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view"
+        },
+        "rig_type": "static_object",
+        "seed": 197863,
+        "source": "디자이너 작업",
+        "source_object": null,
+        "state": "complete",
+        "texture": 2048,
+        "warning": null
+      },
+      {
+        "approved": false,
+        "base_version": "07e11470d9784dc28f0d989fa37236d3",
+        "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+        "candidate_count": 3,
+        "candidate_index": 2,
+        "created": 1788932803.0091212,
+        "faces": 1000000,
+        "id": "fb4544e092d64167b79acdd9fff53f0d",
+        "label": "이미지 후보 2/3",
+        "media": {
+          "reference": "/api/versions/fb4544e092d64167b79acdd9fff53f0d/files/reference"
+        },
+        "metrics": {
+          "caption": {
+            "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+            "cached": true,
+            "cleaned_prompt": "A car",
+            "device": "CPU",
+            "model": "gpt-oss:20b",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+            "seconds": 0,
+            "stage": "caption"
+          },
+          "reference": {
+            "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+            "body_plan": null,
+            "cleaned_prompt": "A car",
+            "configuration": {
+              "cpu_threads": 8,
+              "dtype": "bfloat16",
+              "gpu_count": 1,
+              "offload": "quantized transformer GPU resident; text encoder CPU BF16",
+              "prompt_enhancer": false,
+              "quantization": "bitsandbytes INT8",
+              "resolution": [
+                1024,
+                1024
+              ],
+              "scheduler_shift": 3.0,
+              "scheduler_shift_terminal": null,
+              "steps": 8,
+              "true_cfg_scale": 1.0
+            },
+            "pe_seed": 197861,
+            "peak_allocated_gib": 21.917927265167236,
+            "peak_reserved_gib": 22.23828125,
+            "prompt_enhancer": false,
+            "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "revised_prompt": null,
+            "seed": 197862,
+            "shared_prompt": true
+          }
+        },
+        "model": "qwen_int8",
+        "object_name": "car",
+        "parent": "576021d4e70d424da0d5ef64e312e55b",
+        "prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+        "prompt_trace": {
+          "cleaned_prompt": "A car",
+          "enhanced_prompt": null,
+          "enhancer": false,
+          "model": "qwen_int8",
+          "pe_seed": 197861,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "seed": 197862,
+          "shared_prompt": true,
+          "source_version": "fb4544e092d64167b79acdd9fff53f0d",
+          "template_prompt": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view"
+        },
+        "rig_type": "static_object",
+        "seed": 197862,
+        "source": "디자이너 작업",
+        "source_object": null,
+        "state": "complete",
+        "texture": 2048,
+        "warning": null
+      },
+      {
+        "approved": false,
+        "base_version": "07e11470d9784dc28f0d989fa37236d3",
+        "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+        "candidate_count": 3,
+        "candidate_index": 1,
+        "created": 1788932802.9870842,
+        "faces": 1000000,
+        "id": "312d8f4aea9e40a28c7e2602bc03b77e",
+        "label": "이미지 후보 1/3",
+        "media": {
+          "reference": "/api/versions/312d8f4aea9e40a28c7e2602bc03b77e/files/reference"
+        },
+        "metrics": {
+          "caption": {
+            "cache_key": "94a0b4eba8ad9eda1fd99a0d20ed4071440e62149d3bbcd5c9b180df58548467",
+            "cached": true,
+            "cleaned_prompt": "A car",
+            "device": "CPU",
+            "model": "gpt-oss:20b",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "rules_sha256": "f681b259600d6211569ce3dfd89db7c4c12cfd209e428021cb780685b13433d0",
+            "seconds": 0,
+            "stage": "caption"
+          },
+          "reference": {
+            "batch_id": "2d83c59cbc0743faa6a2edc91318d4e4",
+            "body_plan": null,
+            "cleaned_prompt": "A car",
+            "configuration": {
+              "cpu_threads": 8,
+              "dtype": "bfloat16",
+              "gpu_count": 1,
+              "offload": "quantized transformer GPU resident; text encoder CPU BF16",
+              "prompt_enhancer": false,
+              "quantization": "bitsandbytes INT8",
+              "resolution": [
+                1024,
+                1024
+              ],
+              "scheduler_shift": 3.0,
+              "scheduler_shift_terminal": null,
+              "steps": 8,
+              "true_cfg_scale": 1.0
+            },
+            "pe_seed": 197861,
+            "peak_allocated_gib": 21.917927265167236,
+            "peak_reserved_gib": 22.23828125,
+            "prompt_enhancer": false,
+            "prompt_used": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view",
+            "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+            "revised_prompt": null,
+            "seed": 197861,
+            "shared_prompt": true
+          }
+        },
+        "model": "qwen_int8",
+        "object_name": "car",
+        "parent": "576021d4e70d424da0d5ef64e312e55b",
+        "prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+        "prompt_trace": {
+          "cleaned_prompt": "A car",
+          "enhanced_prompt": null,
+          "enhancer": false,
+          "model": "qwen_int8",
+          "pe_seed": 197861,
+          "raw_prompt": "one of the cars lined up on the ferry deck, the car Su-rin is riding in",
+          "seed": 197861,
+          "shared_prompt": true,
+          "source_version": "312d8f4aea9e40a28c7e2602bc03b77e",
+          "template_prompt": "A car, car, single centered object, neutral background, full object visible in frame, unoccluded, three-quarter view"
+        },
+        "rig_type": "static_object",
+        "seed": 197861,
+        "source": "디자이너 작업",
+        "source_object": null,
+        "state": "complete",
+        "texture": 2048,
+        "warning": null
+      }
+    ],
+    "review_url": "http://10.254.62.200:8766/?asset=576021d4e70d424da0d5ef64e312e55b&version=312d8f4aea9e40a28c7e2602bc03b77e&tab=t2i"
+  }
+]
