@@ -261,7 +261,7 @@ class Studio:
                 raise ValueError('대기열이 가득 찼습니다. 완료 후 다시 요청하세요.')
             seed = data.get('seed')
             seed = int.from_bytes(os.urandom(4),'little') % 1000000 if seed in (None,'') else int(seed)
-            faces, texture = int(data.get('faces',1000000)), int(data.get('texture',2048))
+            faces, texture = int(data.get('faces',300000)), int(data.get('texture',2048))
             if not 0 <= seed <= 2147470000 or faces not in (100000,300000,1000000) or texture not in (1024,2048):
                 raise ValueError('생성 설정 범위를 확인하세요.')
             rig = data.get('rig_type',source.get('rig_type','')) or ''
